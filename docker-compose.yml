@@ -1,0 +1,14 @@
+services:
+  wechaty:
+    build:
+      context: ./telegram_bot
+      dockerfile: Dockerfile
+    container_name: telegram-bot
+    command: python main.py
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - type: bind
+        source: ./telegram_bot
+        target: /app
+    network_mode: host
