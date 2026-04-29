@@ -18,23 +18,45 @@ export default function Home() {
   return (
     <>
       <header>
-        <h1>Resume Tailoring System</h1>
+        <h1>Resume Tailor 📝</h1>
       </header>
+
       <main>
-        <div className="card">
-          <h2>Hello World</h2>
-          <p>
-            Upload your resume, paste a job description, and get a tailored
-            version in seconds.
-          </p>
-          <div className={`backend-status ${status}`}>
-            {status === "loading" && "Checking backend..."}
-            {status === "connected" && "Backend connected"}
-            {status === "error" &&
-              "Backend unreachable — ensure docker compose up is running"}
+        <div className="container">
+
+          <div className="container-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>Job Description</div>
+            <div className="character-count-text">0 / 5000</div>
+          </div>
+
+          <div className="editor-area">
+            <div id="editor-input" contentEditable="true" data-placeholder="Paste job description text here..."></div>
           </div>
         </div>
-      </main>
+
+        <div className="container">
+          <div className="container-header">
+            Upload your resume
+
+            <div className="upload-box" style={{ display: "flex", alignItems: "center" }}>
+              <img
+                src="/icons/upload.svg"
+                alt="upload icon"
+                style={{ width: "40px", height: "40px" }}
+              />
+
+              <div style={{ flexDirection: "column", marginLeft: "2rem" }}>
+                <div className="upload-text"> Drag and drop file here </div>
+                <div className="upload-comment-text">Limit 200 MB. Supported format: PDF</div>
+              </div>
+
+              <button className="upload-button"> Choose file </button>
+            </div>
+          </div>
+        </div>
+
+        <button className="submit-button">Generate</button>
+      </main >
     </>
   );
 }
