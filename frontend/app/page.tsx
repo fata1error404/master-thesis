@@ -1,42 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import "./globals.css";
 
 export default function Home() {
-  const [status, setStatus] = useState<"loading" | "connected" | "error">(
-    "loading"
-  );
+  const [jobDescriptionText, setJobText] = useState("");
+  const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/")
-      .then((r) => r.json())
-      .then(() => setStatus("connected"))
-      .catch(() => setStatus("error"));
-  }, []);
+  const handleJobInput = (e: React.FormEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+
+    const value = el.textContent ?? "";
+
+    setIsJobDescriptionTextOverLimit(value.length > 5000);
+
+    setJobText(value);
+
+    if (value.length === 0) {
+      el.innerHTML = "";
+    }
+  };
+
+  const isSubmitDisabled =
+    jobDescriptionText.length === 0 ||
+    jobDescriptionText.length > 5000;
 
   return (
     <>
       <header>
-        <h1>Resume Tailor 📝</h1>
+        <h1>ResumePilot AI 📝</h1>
+        <h2>| Ivan Yazykov, Tsinghua 2026</h2>
       </header>
 
       <main>
-        <div className="container">
+        <div className="container" style={{ marginTop: "2rem" }}>
 
           <div className="container-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>Job Description</div>
-            <div className="character-count-text">0 / 5000</div>
+            <div className="character-count-text" style={{ color: isJobDescriptionTextOverLimit ? "red" : "#777" }}>{jobDescriptionText.length} / 5000</div>
           </div>
 
-          <div className="editor-area">
-            <div id="editor-input" contentEditable="true" data-placeholder="Paste job description text here..."></div>
+          <div className="job-description-box">
+            <div id="job-description-input" contentEditable data-placeholder="Paste job description text here..." onInput={handleJobInput}></div>
           </div>
         </div>
 
         <div className="container">
           <div className="container-header">
-            Upload your resume
+            Your Resume
 
             <div className="upload-box" style={{ display: "flex", alignItems: "center" }}>
               <img
@@ -55,7 +66,12 @@ export default function Home() {
           </div>
         </div>
 
-        <button className="submit-button">Generate</button>
+        <button
+          className="submit-button"
+          disabled={isSubmitDisabled}
+        >
+          Generate
+        </button>
       </main >
     </>
   );
