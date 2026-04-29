@@ -1,14 +1,39 @@
 services:
-  wechaty:
+  # bot:
+  #   build:
+  #     context: ./telegram_bot
+  #     dockerfile: Dockerfile
+  #   container_name: telegram-bot
+  #   command: python main.py
+  #   environment:
+  #     TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+  #   volumes:
+  #     - type: bind
+  #       source: ./telegram_bot
+  #       target: /app
+  #   network_mode: host
+
+  backend:
     build:
-      context: ./telegram_bot
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: telegram-bot
-    command: python main.py
-    environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    container_name: resume-backend
+    ports:
+      - "8000:8000"
     volumes:
       - type: bind
-        source: ./telegram_bot
+        source: ./backend
         target: /app
-    network_mode: host
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resume-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - type: bind
+        source: ./frontend
+        target: /app
+
