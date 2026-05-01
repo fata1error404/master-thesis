@@ -12,7 +12,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <header>
+          <h1>ResumePilot AI 📝</h1>
+          <h2>| Ivan Yazykov, Tsinghua 2026</h2>
+        </header>
+
+        {children}
+      </body>
     </html>
   );
 }

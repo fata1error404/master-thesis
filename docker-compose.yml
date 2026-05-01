@@ -18,8 +18,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: resume-backend
-    ports:
-      - "8000:8000"
+    tty: true
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    network_mode: host
     volumes:
       - type: bind
         source: ./backend

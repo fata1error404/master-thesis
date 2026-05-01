@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@uiw/react-json-view": "^2.0.0-alpha.42",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

@@ -1,0 +1,41 @@
+import json
+from pathlib import Path
+
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+from prompts.resume_prompt import JOB_DETAILS_EXTRACTOR
+from schemas.job_details_schema import JobDetails
+
+# initialize OpenAI LLM (temperature = 0 ensures deterministic output, which is important for structured extraction)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+# prompt definition: system message defines the role of the model (instruction about identity + behavior), while human message provides the task itself – <task> pre-defined prompt + input placeholder <job_description>
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You extract structured job details from job descriptions."),
+    ("human", JOB_DETAILS_EXTRACTOR),
+])
+
+# enforce the model to use structured output (pydantic schema job_details_schema.py) instead of free-form text
+structured_llm = llm.with_structured_output(JobDetails)
+
+
+def extract_job_details(job_description: str, save_path: str | None = None) -> dict:
+    # combine prompt + structured output model into a single pipeline
+    chain = prompt | structured_llm
+
+    # run LLM inference with runtime input injected into the prompt
+    result = chain.invoke({"job_description": job_description})
+
+    # convert Pydantic model → Python dictionary
+    data = result.model_dump()
+
+    # save to JSON
+    if save_path:
+        path = Path(save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    return data

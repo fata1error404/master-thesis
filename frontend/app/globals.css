@@ -227,3 +227,47 @@ main {
     --border-angle: -360deg;
   }
 } */
+
+/* CV GENERATION PAGE
+   ________________ */
+
+.generation-text {
+  color: var(--text-color);
+  font-size: 1.1rem;
+  margin-left: 1.5rem;
+}
+
+.expand-button {
+  background: transparent;
+  border: none;
+}
+
+.expand-button:hover {
+  background: var(--button-hover-bg);
+}
+
+.json-text-box {
+  padding-left: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d4d4d4;
+  border-top: 2px solid #080808;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-top: -2px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

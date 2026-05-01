@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import "./globals.css";
 
 export default function Home() {
+  const router = useRouter();
+
   const [jobDescriptionText, setJobText] = useState("");
   const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
 
@@ -21,17 +24,17 @@ export default function Home() {
     }
   };
 
+  const handleGenerateButton = () => {
+    localStorage.setItem("job_description", jobDescriptionText);
+    router.push("/cv_generation");
+  };
+
   const isSubmitDisabled =
     jobDescriptionText.length === 0 ||
     jobDescriptionText.length > 5000;
 
   return (
     <>
-      <header>
-        <h1>ResumePilot AI 📝</h1>
-        <h2>| Ivan Yazykov, Tsinghua 2026</h2>
-      </header>
-
       <main>
         <div className="container" style={{ marginTop: "2rem" }}>
 
@@ -69,6 +72,7 @@ export default function Home() {
         <button
           className="submit-button"
           disabled={isSubmitDisabled}
+          onClick={handleGenerateButton}
         >
           Generate
         </button>

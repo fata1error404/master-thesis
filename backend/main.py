@@ -1,14 +1,32 @@
 from pathlib import Path
+from typing import Optional
+from dataclasses import dataclass
+from typing import Any, Dict
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI()
+from llm.context_builder import introduce_context
+from llm.job_details_extractor import extract_job_details
 
+@dataclass
+class PipelineState:
+    job_description: str
+    job_context: str | None = None
+    job_details: Dict[str, Any] | None = None
+    resume_data: Dict[str, Any] | None = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 class TailorRequest(BaseModel):
-    resume_text: str
+    resume_text: Optional[str] = ""
     job_description: str
 
 
@@ -39,7 +57,18 @@ async def root():
 @app.post("/api/tailor")
 async def tailor(request: TailorRequest):
     try:
-        result = f"Tailored resume for: {request.job_description[:50]}..."
-        return {"result": result}
+        state = PipelineState(job_description=request.job_description)
+
+        state = introduce_context(state)
+
+        details = extract_job_details(
+            state.job_description,
+            save_path="outputs/job_details.json"
+        )
+
+        state.job_details = details
+
+        return state.job_details
+
     except Exception as e:
         return {"error": str(e)}
