@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import "./globals.css";
 
 export default function Home() {
-  const router = useRouter();
-
+  // job description section
   const [jobDescriptionText, setJobText] = useState("");
   const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
 
@@ -24,12 +23,57 @@ export default function Home() {
     }
   };
 
-  const handleGenerateButton = () => {
+  // resume section
+  const [file, setFile] = useState<File | null>(null); // stores the selected uploaded file (PDF) as a browser Web API File object
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  const handleFileSelection = (f: File | null) => {
+    if (!f) return;
+
+    const isPdf =
+      f.type === "application/pdf" ||
+      f.name.toLowerCase().endsWith(".pdf");
+
+    if (!isPdf) {
+      alert("Only PDF files are allowed");
+      return;
+    }
+
+    setFile(f);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  };
+
+  // 'Generate' button
+  const router = useRouter();
+
+  const handleGenerateButton = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("http://localhost:8000/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
     localStorage.setItem("job_description", jobDescriptionText);
+    localStorage.setItem("resume_file_id", data.id);
+
     router.push("/cv_generation");
   };
 
   const isSubmitDisabled =
+    !file ||
     jobDescriptionText.length === 0 ||
     jobDescriptionText.length > 5000;
 
@@ -52,7 +96,30 @@ export default function Home() {
           <div className="container-header">
             Your Resume
 
-            <div className="upload-box" style={{ display: "flex", alignItems: "center" }}>
+            <div
+              className={`upload-box ${isDraggingFile ? "dragging" : ""}`}
+              style={{ display: "flex", alignItems: "center" }}
+
+              onClick={() => fileInputRef.current?.click()}
+
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setIsDraggingFile(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingFile(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDraggingFile(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingFile(false);
+                handleFileSelection(e.dataTransfer.files?.[0]);
+              }}
+            >
               <img
                 src="/icons/upload.svg"
                 alt="upload icon"
@@ -60,12 +127,55 @@ export default function Home() {
               />
 
               <div style={{ flexDirection: "column", marginLeft: "2rem" }}>
-                <div className="upload-text"> Drag and drop file here </div>
-                <div className="upload-comment-text">Limit 200 MB. Supported format: PDF</div>
+                <div className="upload-text">
+                  {file ? "File selected ✔" : "Drag and drop file here"}
+                </div>
+
+                <div className="upload-comment-text">
+                  Limit 200 MB. Supported format: PDF
+                </div>
               </div>
 
-              <button className="upload-button"> Choose file </button>
+              <button
+                className="upload-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+              >
+                Choose file
+              </button>
+
+              {/* hidden input to support system file dialog */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                onChange={(e) => handleFileSelection(e.target.files?.[0] ?? null)}
+              />
             </div>
+
+            {file && (
+              <div style={{ display: "flex", alignItems: "center", marginLeft: "2.4rem", marginTop: "1rem" }}>
+                <img
+                  src="/icons/file.svg"
+                  alt="file icon"
+                  style={{ width: "35px", height: "35px" }}
+                />
+
+                <div style={{ fontSize: "1rem", color: "#e5e5e5", marginLeft: "2.1rem" }}>{file.name}</div>
+                <div style={{ fontSize: "0.8rem", color: "lightgray", marginLeft: "0.7rem" }}>{formatFileSize(file.size)}</div>
+
+                <button className="delete-button" onClick={() => setFile(null)}>
+                  <img
+                    src="/icons/delete.svg"
+                    alt="close icon"
+                    style={{ width: "30px", height: "30px" }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

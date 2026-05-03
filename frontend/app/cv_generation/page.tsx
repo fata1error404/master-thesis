@@ -15,12 +15,10 @@ export default function CVGenerationPage() {
     const [isResumeSuccess, setIsResumeSuccess] = useState(false);
 
     useEffect(() => {
-        const job_description_text = localStorage.getItem("job_description");
+        const jobDescriptionText = localStorage.getItem("job_description");
+        const resumeFileID = localStorage.getItem("resume_file_id");
 
-        if (!job_description_text) {
-            setJobDescriptionAnalysisStatus("No job description found.");
-            return;
-        }
+        if (!jobDescriptionText || !resumeFileID) return;
 
         const run = async () => {
             try {
@@ -30,8 +28,8 @@ export default function CVGenerationPage() {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        resume_text: "",
-                        job_description: job_description_text,
+                        resume_file_id: resumeFileID,
+                        job_description: jobDescriptionText,
                     }),
                 });
 

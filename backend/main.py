@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 from typing import Any, Dict
+from uuid import uuid4
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -26,7 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 class TailorRequest(BaseModel):
-    resume_text: Optional[str] = ""
+    resume_file_id: str
     job_description: str
 
 
@@ -52,6 +53,17 @@ if public_dir.exists():
 @app.get("/")
 async def root():
     return {"message": "Hello from backend — API docs at /docs"}
+
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...)):
+    file_id = str(uuid4())
+
+    contents = await file.read()
+
+    with open(f"outputs/{file_id}.pdf", "wb") as f:
+        f.write(contents)
+
+    return {"id": file_id}
 
 
 @app.post("/api/tailor")
