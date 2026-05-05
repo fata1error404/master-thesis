@@ -1,5 +1,6 @@
 .vscode/
 data/
+database/
 docs/Resume.csv
 backend/__pycache__/
 backend/llm/__pycache__/
