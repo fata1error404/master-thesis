@@ -11,4 +11,3 @@ frontend/.next/
 frontend/node_modules/
 reference/
 .env
-test.py

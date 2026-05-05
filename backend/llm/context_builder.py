@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
-from prompts.resume_prompt import RESUME_WRITER_PERSONA
+from prompts.prompt_1_context import RESUME_WRITER_PERSONA
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
-from prompts.resume_prompt import JOB_DETAILS_EXTRACTOR
+from prompts.prompt_2_job_details_extraction import JOB_DETAILS_EXTRACTOR
 from schemas.job_details_schema import JobDetails
 
 # initialize OpenAI LLM (temperature = 0 ensures deterministic output, which is important for structured extraction)
@@ -12,7 +12,7 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # prompt definition: system message defines the role of the model (instruction about identity + behavior), while human message provides the task itself – <task> pre-defined prompt + input placeholder <job_description>
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You extract structured job details from job descriptions."),
+    ("system", "You extract structured job details from job description text."),
     ("human", JOB_DETAILS_EXTRACTOR),
 ])
 
@@ -25,7 +25,7 @@ def extract_job_details(job_description: str, save_path: str | None = None) -> d
     chain = prompt | structured_llm
 
     # run LLM inference with runtime input injected into the prompt
-    result = chain.invoke({"job_description": job_description})
+    result = chain.invoke({"job_description_text": job_description})
 
     # convert Pydantic model → Python dictionary
     data = result.model_dump()

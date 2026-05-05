@@ -23,6 +23,10 @@
   --header-border: #1f1f1f;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 header {
   position: fixed;
   top: 0;
@@ -55,8 +59,6 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  height: 100vh;
   margin: 0;
   font-family: sans-serif;
 }
@@ -66,8 +68,8 @@ main {
   flex-direction: column;
   gap: 1rem;
   width: 90%;
-  height: 84%;
   max-width: 50rem;
+  padding-bottom: 3rem;
 }
 
 .container {
@@ -88,6 +90,7 @@ main {
   border-bottom: 1px solid var(--container-header-border);
   font-size: 1.3rem;
   color: var(--text-color);
+  z-index: 1;
 }
 
 /* JOB DESCRIPTION CONTAINER
@@ -101,6 +104,10 @@ main {
   overflow-y: auto;
   min-height: 10rem;
   max-height: 20rem;
+}
+
+.job-description-box:hover {
+  cursor: text;
 }
 
 #job-description-input {
@@ -252,9 +259,15 @@ main {
 /* CV GENERATION PAGE
    ________________ */
 
+.generation-header-text {
+  color: var(--text-color);
+  font-size: 1.5rem;
+  margin-left: 1.5rem;
+}
+
 .generation-text {
   color: var(--text-color);
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   margin-left: 1.5rem;
 }
 
@@ -264,7 +277,31 @@ main {
 }
 
 .expand-button:hover {
-  background: var(--button-hover-bg);
+  cursor: pointer;
+}
+
+.json-wrapper {
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease,
+    max-height 0.5s ease,
+    filter 0.5s ease;
+  z-index: 0;
+}
+
+.json-wrapper.collapsed {
+  opacity: 0.5;
+  transform: translateY(-4px);
+  max-height: 50px;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+
+.json-wrapper.expanded {
+  opacity: 1;
+  transform: translateY(0);
+  filter: grayscale(0);
+  pointer-events: auto;
 }
 
 .json-text-box {

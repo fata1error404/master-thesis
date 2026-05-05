@@ -6,6 +6,7 @@ import "./globals.css";
 
 export default function Home() {
   // job description section
+  const textInputRef = useRef<HTMLDivElement | null>(null);
   const [jobDescriptionText, setJobText] = useState("");
   const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
 
@@ -20,6 +21,29 @@ export default function Home() {
 
     if (value.length === 0) {
       el.innerHTML = "";
+    }
+  };
+
+  const handleJobInputBoxClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = textInputRef.current;
+    if (!el) return;
+
+    const selection = window.getSelection();
+
+    const clickedInsideText =
+      selection &&
+      selection.anchorNode &&
+      el.contains(selection.anchorNode);
+
+    if (!clickedInsideText || el.innerText.trim().length === 0) {
+      el.focus();
+
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+
+      selection?.removeAllRanges();
+      selection?.addRange(range);
     }
   };
 
@@ -80,15 +104,21 @@ export default function Home() {
   return (
     <>
       <main>
-        <div className="container" style={{ marginTop: "2rem" }}>
+        <div className="container" style={{ marginTop: "7rem" }}>
 
           <div className="container-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>Job Description</div>
             <div className="character-count-text" style={{ color: isJobDescriptionTextOverLimit ? "red" : "#777" }}>{jobDescriptionText.length} / 5000</div>
           </div>
 
-          <div className="job-description-box">
-            <div id="job-description-input" contentEditable data-placeholder="Paste job description text here..." onInput={handleJobInput}></div>
+          <div className="job-description-box" onClick={handleJobInputBoxClick}>
+            <div
+              ref={textInputRef}
+              id="job-description-input"
+              contentEditable
+              data-placeholder="Paste job description text here..."
+              onInput={handleJobInput}>
+            </div>
           </div>
         </div>
 
