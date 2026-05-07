@@ -2,6 +2,8 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.0.0
 langchain
+langchain_chroma
 langchain-openai
+langchain_community
 python-multipart
 pymupdf

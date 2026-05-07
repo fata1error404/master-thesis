@@ -12,9 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+
 from llm.context_builder import introduce_context
 from llm.job_details_extractor import extract_job_details
 from llm.resume_extractor import extract_resume
+from llm.rag_retriever import retrieve_rag_context
 
 @dataclass
 class PipelineState:
@@ -22,9 +26,17 @@ class PipelineState:
     job_context: str | None = None
     job_details: Dict[str, Any] | None = None
     resume_data: Dict[str, Any] | None = None
+    rag_context: Dict[str, Any] | None = None 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    embedding_model = OpenAIEmbeddings()
+
+    app.state.resume_vector_db = Chroma(
+        persist_directory="/app/database",
+        embedding_function=embedding_model
+    )
+
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -131,6 +143,28 @@ async def tailor(request: TailorRequest):
             yield json.dumps({
                 "type": "error",
                 "step": "resume_details_extraction",
+                "message": str(e)
+            }) + "\n"
+
+        try:
+            vector_db = app.state.resume_vector_db
+
+            state.rag_context = await asyncio.to_thread(
+                retrieve_rag_context,
+                vector_db,
+                state.job_details,
+                8
+            )
+
+            yield json.dumps({
+                "type": "rag_context",
+                "data": state.rag_context["retrieved_count"],
+            }) + "\n"
+
+        except Exception as e:
+            yield json.dumps({
+                "type": "error",
+                "step": "rag_retrieval",
                 "message": str(e)
             }) + "\n"
 

@@ -12,6 +12,9 @@ services:
       - type: bind
         source: ./backend
         target: /app
+      - type: bind
+        source: ./database
+        target: /app/database
 
   frontend:
     build:

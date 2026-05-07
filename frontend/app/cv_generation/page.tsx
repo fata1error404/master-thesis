@@ -15,6 +15,12 @@ export default function CVGenerationPage() {
     const [resumeJSON, setResumeJSON] = useState(null);
     const [isResumeExpanded, setIsResumeExpanded] = useState(false);
     const [isResumeExtractionSuccess, setIsResumeExtractionSuccess] = useState(false);
+
+    const [RAGStatus, setRAGStatus] = useState("");
+    const [RAGContextCount, setRAGContextCount] = useState(null);
+    const [isRAGExpanded, setIsRAGExpanded] = useState(false);
+    const [isRAGRetrievalSuccess, setIsRAGRetrievalSuccess] = useState(false);
+
     const [isSectionGenerationSuccess, setIsSectionGenerationSuccess] = useState(false);
 
     const hasRun = useRef(false);
@@ -75,6 +81,12 @@ export default function CVGenerationPage() {
                             setResumeAnalysisStatus("Done ✔️");
                         }
 
+                        if (event.type === "rag_context") {
+                            setRAGContextCount(event.data);
+                            setIsRAGRetrievalSuccess(true);
+                            setRAGStatus("Done ✔️");
+                        }
+
                         if (event.type === "error") {
                             if (event.step === "job_details_extraction") {
                                 setJobDescriptionAnalysisStatus("Failed.");
@@ -82,6 +94,10 @@ export default function CVGenerationPage() {
 
                             if (event.step === "resume_details_extraction") {
                                 setResumeAnalysisStatus("Failed.");
+                            }
+
+                            if (event.step === "rag_retrieval") {
+                                setRAGStatus("Failed.");
                             }
                         }
                     }
@@ -185,7 +201,29 @@ export default function CVGenerationPage() {
 
                 {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 2. Tailored Resume Generation </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 2. RAG Retrieval </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <div className="generation-text"> Querying the vector database to get top-k similar documents from the vector database using cosine similarity.. </div>
+
+                            {!isRAGRetrievalSuccess && (<div className="loading-spinner" />)}
+                        </div>
+
+                        <div className="generation-text" style={{ marginTop: "-0.5rem" }}> Retrieved resume text chunks will be used as an additional context for tailored resume generation. </div>
+
+                        <div className="generation-text">{RAGStatus}</div>
+
+                        {isRAGRetrievalSuccess && (
+                            <div className="generation-text">
+                                Retrieved <span style={{ fontWeight: "bold" }}> {RAGContextCount} </span> resume text chunks.
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && (
+                    <>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 3. Tailored Resume Generation </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
