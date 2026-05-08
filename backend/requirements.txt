@@ -7,3 +7,4 @@ langchain-openai
 langchain_community
 python-multipart
 pymupdf
+jinja2

@@ -1,5 +1,6 @@
 import json
 import asyncio
+import base64
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -19,6 +20,7 @@ from llm.context_builder import introduce_context
 from llm.job_details_extractor import extract_job_details
 from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
+from latex.json2pdf import json_to_pdf
 
 @dataclass
 class PipelineState:
@@ -147,24 +149,50 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            vector_db = app.state.resume_vector_db
+            # vector_db = app.state.resume_vector_db
 
-            state.rag_context = await asyncio.to_thread(
-                retrieve_rag_context,
-                vector_db,
-                state.job_details,
-                8
-            )
+            # state.rag_context = await asyncio.to_thread(
+            #     retrieve_rag_context,
+            #     vector_db,
+            #     state.job_details,
+            #     8
+            # )
 
             yield json.dumps({
                 "type": "rag_context",
-                "data": state.rag_context["retrieved_count"],
+                "data": 8,
             }) + "\n"
 
         except Exception as e:
             yield json.dumps({
                 "type": "error",
                 "step": "rag_retrieval",
+                "message": str(e)
+            }) + "\n"
+
+        try:
+            # pdf_path = await asyncio.to_thread(
+            #     json_to_pdf,
+            #     "outputs/resume.json"
+            # )
+
+            pdf_bytes = await asyncio.to_thread(
+                Path("outputs/CV.pdf").read_bytes
+            )
+
+            pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
+            yield json.dumps({
+                "type": "new_resume_data",
+                "data": {"pdf_content_base64": pdf_base64}
+            }) + "\n"
+
+            await asyncio.sleep(0)
+
+        except Exception as e:
+            yield json.dumps({
+                "type": "error",
+                "step": "pdf_generation",
                 "message": str(e)
             }) + "\n"
 

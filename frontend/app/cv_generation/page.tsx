@@ -23,6 +23,10 @@ export default function CVGenerationPage() {
 
     const [isSectionGenerationSuccess, setIsSectionGenerationSuccess] = useState(false);
 
+    const [pdfGenerationStatus, setPdfGenerationStatus] = useState("");
+    const [pdfURL, setPdfURL] = useState<string | null>(null);
+    const [isPdfGenerationSuccess, setIsPdfGenerationSuccess] = useState(false);
+
     const hasRun = useRef(false);
 
     useEffect(() => {
@@ -87,6 +91,22 @@ export default function CVGenerationPage() {
                             setRAGStatus("Done ✔️");
                         }
 
+                        if (event.type === "new_resume_data") {
+                            const base64 = event.data.pdf_content_base64;
+                            const binary = atob(base64);
+                            const bytes = new Uint8Array(binary.length);
+
+                            for (let i = 0; i < binary.length; i++)
+                                bytes[i] = binary.charCodeAt(i);
+
+                            const blob = new Blob([bytes], { type: "application/pdf" });
+                            const url = URL.createObjectURL(blob);
+
+                            setPdfURL(url);
+                            setIsPdfGenerationSuccess(true);
+                            setPdfGenerationStatus("Done ✔️");
+                        }
+
                         if (event.type === "error") {
                             if (event.step === "job_details_extraction") {
                                 setJobDescriptionAnalysisStatus("Failed.");
@@ -98,6 +118,10 @@ export default function CVGenerationPage() {
 
                             if (event.step === "rag_retrieval") {
                                 setRAGStatus("Failed.");
+                            }
+
+                            if (event.step === "pdf_generation") {
+                                setPdfGenerationStatus("Failed.");
                             }
                         }
                     }
@@ -225,12 +249,44 @@ export default function CVGenerationPage() {
                     <>
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 3. Tailored Resume Generation </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        {/* <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
 
                             {!isSectionGenerationSuccess && (<div className="loading-spinner" />)}
+                        </div> */}
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <div className="generation-text"> Converting new resume: JSON to LaTeX to PDF.. </div>
+
+                            {!isPdfGenerationSuccess && (<div className="loading-spinner" />)}
                         </div>
 
+                        <div className="generation-text">{pdfGenerationStatus}</div>
+
+                        {pdfURL && (
+                            <>
+                                <div style={{ color: "white", fontSize: "1.8rem", fontWeight: "bold", marginLeft: "1.5rem", marginTop: "2rem" }}> Generated Resume </div>
+
+                                <div style={{ background: "#212121", width: "100%", height: "0.5rem" }}></div>
+
+                                <div
+                                    style={{
+                                        width: "100%",
+                                        aspectRatio: "1 / 1.414",
+                                        marginTop: "-1rem"
+                                    }}
+                                >
+                                    <iframe
+                                        src={`${pdfURL}#toolbar=0`}
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            border: "none",
+                                        }}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </>
                 )}
             </main >
