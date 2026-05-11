@@ -10,6 +10,9 @@ export default function CVGenerationPage() {
     const [jobDescriptionJSON, setJobDescriptionJSON] = useState(null);
     const [isJobDetailsExpanded, setIsJobDetailsExpanded] = useState(false);
     const [isJobDetailsExtractionSuccess, setIsJobDetailsExtractionSuccess] = useState(false);
+    const [jobTitle, setJobTitle] = useState("");
+    const [jobPurpose, setJobPurpose] = useState("");
+    const [jobCompanyName, setJobCompanyName] = useState("");
 
     const [resumeAnalysisStatus, setResumeAnalysisStatus] = useState("");
     const [resumeJSON, setResumeJSON] = useState(null);
@@ -24,8 +27,79 @@ export default function CVGenerationPage() {
     const [isSectionGenerationSuccess, setIsSectionGenerationSuccess] = useState(false);
 
     const [pdfGenerationStatus, setPdfGenerationStatus] = useState("");
-    const [pdfURL, setPdfURL] = useState<string | null>(null);
+    const [newPdfURL, setNewPdfURL] = useState<string | null>(null);
+    const [originalPdfURL, setOriginalPdfURL] = useState<string | null>(null);
     const [isPdfGenerationSuccess, setIsPdfGenerationSuccess] = useState(false);
+
+    const [isComparePopupOpen, setIsComparePopupOpen] = useState(false);
+    const [isComparePopupReady, setIsComparePopupReady] = useState(false);
+
+    const compareButtonRef = useRef<HTMLButtonElement | null>(null);
+    const [isCompareClosing, setIsCompareClosing] = useState(false);
+    const [compareOrigin, setCompareOrigin] = useState({
+        top: 0,
+        left: 0,
+        width: 0,
+        height: 0,
+    });
+
+    const handleOpenCompare = () => {
+        const rect = compareButtonRef.current?.getBoundingClientRect();
+
+        if (rect) {
+            setCompareOrigin({
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+            });
+        }
+
+        setIsComparePopupOpen(true);
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                document
+                    .querySelector(".popup-container")
+                    ?.classList.add("popup-container--open");
+
+                setTimeout(() => {
+                    setIsComparePopupReady(true);
+                }, 700);
+            });
+        });
+    };
+
+    const handleCloseCompare = () => {
+        // setIsCompareClosing(true);
+        setIsComparePopupReady(false);
+        setIsComparePopupOpen(false);
+
+        const el = document.querySelector(".popup-container");
+        el?.classList.remove("popup-container--open");
+
+        // setTimeout(() => {
+        //     setIsComparePopupOpen(false);
+        //     setIsCompareClosing(false);
+        // }, 700);
+    };
+
+    const handleDownload = () => {
+        if (!newPdfURL) return;
+
+        const formattedJobTitle = jobTitle
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "_")
+
+        const a = document.createElement("a");
+        a.href = newPdfURL;
+        a.download = `${localStorage.getItem("resume_file_name")}_tailored_${formattedJobTitle}.pdf` || "resume.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
 
     const hasRun = useRef(false);
 
@@ -74,6 +148,10 @@ export default function CVGenerationPage() {
                         const event = JSON.parse(line);
 
                         if (event.type === "job_details") {
+                            setJobTitle(event.data.job_title);
+                            setJobPurpose(event.data.job_purpose);
+                            setJobCompanyName(event.data.company_name);
+
                             setJobDescriptionJSON(event.data);
                             setIsJobDetailsExtractionSuccess(true);
                             setJobDescriptionAnalysisStatus("Done ✔️");
@@ -92,17 +170,32 @@ export default function CVGenerationPage() {
                         }
 
                         if (event.type === "new_resume_data") {
-                            const base64 = event.data.pdf_content_base64;
-                            const binary = atob(base64);
-                            const bytes = new Uint8Array(binary.length);
+                            const new_base64 = event.data.new_pdf_content_base64;
+                            const newBinary = atob(new_base64);
+                            const newBytes = new Uint8Array(newBinary.length);
 
-                            for (let i = 0; i < binary.length; i++)
-                                bytes[i] = binary.charCodeAt(i);
+                            for (let i = 0; i < newBinary.length; i++) {
+                                newBytes[i] = newBinary.charCodeAt(i);
+                            }
 
-                            const blob = new Blob([bytes], { type: "application/pdf" });
-                            const url = URL.createObjectURL(blob);
+                            const newBlob = new Blob([newBytes], { type: "application/pdf" });
+                            const newUrl = URL.createObjectURL(newBlob);
 
-                            setPdfURL(url);
+                            setNewPdfURL(newUrl);
+
+                            const original_base64 = event.data.original_pdf_content_base64;
+                            const originalBinary = atob(original_base64);
+                            const originalBytes = new Uint8Array(originalBinary.length);
+
+                            for (let i = 0; i < originalBinary.length; i++) {
+                                originalBytes[i] = originalBinary.charCodeAt(i);
+                            }
+
+                            const originalBlob = new Blob([originalBytes], { type: "application/pdf" });
+                            const originalUrl = URL.createObjectURL(originalBlob);
+
+                            setOriginalPdfURL(originalUrl);
+
                             setIsPdfGenerationSuccess(true);
                             setPdfGenerationStatus("Done ✔️");
                         }
@@ -139,7 +232,7 @@ export default function CVGenerationPage() {
     return (
         <>
             <main>
-                <div className="generation-header-text" style={{ marginTop: "7rem" }}> Step 1. Input pre-processing </div>
+                <div className="generation-header-text" style={{ marginTop: "7rem" }}> <span style={{ textDecoration: "underline" }}>Step 1.</span> Input pre-processing </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <div className="generation-text"> Analyzing job description.. </div>
@@ -225,7 +318,7 @@ export default function CVGenerationPage() {
 
                 {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 2. RAG Retrieval </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 2.</span> RAG Retrieval </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Querying the vector database to get top-k similar documents from the vector database using cosine similarity.. </div>
@@ -247,7 +340,7 @@ export default function CVGenerationPage() {
 
                 {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Step 3. Tailored Resume Generation </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 3.</span> Tailored Resume Generation </div>
 
                         {/* <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
@@ -263,9 +356,49 @@ export default function CVGenerationPage() {
 
                         <div className="generation-text">{pdfGenerationStatus}</div>
 
-                        {pdfURL && (
+                        {newPdfURL && (
                             <>
-                                <div style={{ color: "white", fontSize: "1.8rem", fontWeight: "bold", marginLeft: "1.5rem", marginTop: "2rem" }}> Generated Resume </div>
+                                <div style={{ display: "flex", alignItems: "center", marginTop: "2rem" }}>
+                                    {/* <img
+                                        src={"/icons/stars-ai.svg"}
+                                        alt="ai icon"
+                                        style={{ width: "35px", height: "35px", marginLeft: "1.5rem", marginRight: "0.4rem" }}
+                                    /> */}
+
+                                    <div style={{
+                                        color: "white", fontSize: "1.8rem", fontWeight: "bold", marginLeft: "1rem"
+                                    }}> Tailored Resume </div>
+
+                                    <button className="final-button" style={{ marginLeft: "auto" }} onClick={handleDownload}>
+                                        Download
+
+                                        <img
+                                            src={"/icons/download.svg"}
+                                            alt="download icon"
+                                            style={{ width: "20px", height: "20px" }}
+                                        />
+                                    </button>
+
+                                    <button className="final-button" style={{ marginLeft: "0.8rem" }} onClick={handleOpenCompare} ref={compareButtonRef}>
+                                        Compare
+
+                                        <img
+                                            src={"/icons/compare.svg"}
+                                            alt="compare icon"
+                                            style={{ width: "20px", height: "20px" }}
+                                        />
+                                    </button>
+
+                                    <button className="final-button" style={{ marginLeft: "0.8rem", fontWeight: "bold" }}>
+                                        Edit in Overleaf
+
+                                        <img
+                                            src={"/icons/overleaf.png"}
+                                            alt="overleaf icon"
+                                            style={{ width: "20px", height: "20px" }}
+                                        />
+                                    </button>
+                                </div>
 
                                 <div style={{ background: "#212121", width: "100%", height: "0.5rem" }}></div>
 
@@ -277,7 +410,7 @@ export default function CVGenerationPage() {
                                     }}
                                 >
                                     <iframe
-                                        src={`${pdfURL}#toolbar=0`}
+                                        src={`${newPdfURL}#toolbar=0`}
                                         style={{
                                             width: "100%",
                                             height: "100%",
@@ -288,6 +421,65 @@ export default function CVGenerationPage() {
                             </>
                         )}
                     </>
+                )}
+
+                {isComparePopupOpen && (
+                    <div className="popup-main" onClick={handleCloseCompare}>
+                        <div
+                            className="popup-container popup-container--anim"
+                            style={{
+                                "--origin-top": `${compareOrigin.top}px`,
+                                "--origin-left": `${compareOrigin.left}px`,
+                                "--origin-width": `${compareOrigin.width}px`,
+                                "--origin-height": `${compareOrigin.height}px`,
+                                lineHeight: "1.4rem"
+                            } as React.CSSProperties}
+                            onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+                                <div className="generation-header-text"> Original vs Tailored</div>
+
+                                <button className="expand-button" onClick={handleCloseCompare}>
+                                    <img
+                                        src={"/icons/delete.svg"}
+                                        alt="popup close icon"
+                                        style={{ width: "30px", height: "30px" }}
+                                    />
+                                </button>
+                            </div>
+
+                            <div className="popup-text"> Tailoring completed for: </div>
+
+                            <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Job Title:</span> {jobTitle} </div>
+                            <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Job Purpose:</span> {jobPurpose} </div>
+                            <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Company Name:</span> {jobCompanyName} </div>
+
+                            {!isCompareClosing && isComparePopupReady && (
+                                <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+                                    <div style={{ flex: 1, aspectRatio: "1 / 1.414" }}>
+                                        <iframe
+                                            src={`${originalPdfURL}#toolbar=0`}
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                border: "none",
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div style={{ flex: 1, aspectRatio: "1 / 1.414" }}>
+                                        <iframe
+                                            src={`${newPdfURL}#toolbar=0`}
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                border: "none",
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
             </main >
         </>

@@ -176,15 +176,23 @@ async def tailor(request: TailorRequest):
             #     "outputs/resume.json"
             # )
 
-            pdf_bytes = await asyncio.to_thread(
+            original_pdf_bytes = await asyncio.to_thread(
+                lambda: Path("outputs", f"{request.resume_file_id}.pdf").read_bytes()
+            )
+
+            original_pdf_base64 = base64.b64encode(original_pdf_bytes).decode("utf-8")
+
+            new_pdf_bytes = await asyncio.to_thread(
                 Path("outputs/CV.pdf").read_bytes
             )
 
-            pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+            new_pdf_base64 = base64.b64encode(new_pdf_bytes).decode("utf-8")
 
             yield json.dumps({
                 "type": "new_resume_data",
-                "data": {"pdf_content_base64": pdf_base64}
+                "data": {
+                    "original_pdf_content_base64": original_pdf_base64,
+                    "new_pdf_content_base64": new_pdf_base64}
             }) + "\n"
 
             await asyncio.sleep(0)

@@ -92,6 +92,7 @@ export default function Home() {
 
     localStorage.setItem("job_description", jobDescriptionText);
     localStorage.setItem("resume_file_id", data.id);
+    localStorage.setItem("resume_file_name", file.name.replace(/\.pdf$/i, ""));
 
     router.push("/cv_generation");
   };
