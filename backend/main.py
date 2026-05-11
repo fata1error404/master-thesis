@@ -20,6 +20,7 @@ from llm.context_builder import introduce_context
 from llm.job_details_extractor import extract_job_details
 from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
+from llm.knowledge_graph_builder import build_knowledge_graph
 from latex.json2pdf import json_to_pdf
 
 @dataclass
@@ -28,7 +29,8 @@ class PipelineState:
     job_context: str | None = None
     job_details: Dict[str, Any] | None = None
     resume_data: Dict[str, Any] | None = None
-    rag_context: Dict[str, Any] | None = None 
+    rag_context: Dict[str, Any] | None = None
+    knowledge_graph: Dict[str, Any] | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -167,6 +169,30 @@ async def tailor(request: TailorRequest):
             yield json.dumps({
                 "type": "error",
                 "step": "rag_retrieval",
+                "message": str(e)
+            }) + "\n"
+
+        try:
+            from schemas.job_details_schema import JobDetails
+            from schemas.resume_schema import Resume
+
+            job_obj = JobDetails(**state.job_details)
+            resume_obj = Resume(**state.resume_data)
+
+            kg = build_knowledge_graph(job_obj, resume_obj)
+            state.knowledge_graph = kg.model_dump()
+
+            yield json.dumps({
+                "type": "knowledge_graph",
+                "data": state.knowledge_graph
+            }) + "\n"
+
+            await asyncio.sleep(0)
+
+        except Exception as e:
+            yield json.dumps({
+                "type": "error",
+                "step": "knowledge_graph_building",
                 "message": str(e)
             }) + "\n"
 

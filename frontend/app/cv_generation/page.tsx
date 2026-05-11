@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import JsonView from '@uiw/react-json-view';
 import { vscodeTheme } from '@uiw/react-json-view/vscode';
+import KnowledgeGraphView from "./KnowledgeGraphView";
 import "../globals.css";
 
 export default function CVGenerationPage() {
@@ -23,6 +24,13 @@ export default function CVGenerationPage() {
     const [RAGContextCount, setRAGContextCount] = useState(null);
     const [isRAGExpanded, setIsRAGExpanded] = useState(false);
     const [isRAGRetrievalSuccess, setIsRAGRetrievalSuccess] = useState(false);
+
+    const [KGStatus, setKGStatus] = useState("");
+    const [knowledgeGraph, setKnowledgeGraph] = useState<{
+        nodes: { id: string; type: string; label: string; meta?: Record<string, unknown> | null }[];
+        edges: { source: string; target: string; relation: string }[];
+    } | null>(null);
+    const [isKGBuildingSuccess, setIsKGBuildingSuccess] = useState(false);
 
     const [isSectionGenerationSuccess, setIsSectionGenerationSuccess] = useState(false);
 
@@ -169,6 +177,12 @@ export default function CVGenerationPage() {
                             setRAGStatus("Done ✔️");
                         }
 
+                        if (event.type === "knowledge_graph") {
+                            setKnowledgeGraph(event.data);
+                            setIsKGBuildingSuccess(true);
+                            setKGStatus("Done ✔️");
+                        }
+
                         if (event.type === "new_resume_data") {
                             const new_base64 = event.data.new_pdf_content_base64;
                             const newBinary = atob(new_base64);
@@ -211,6 +225,10 @@ export default function CVGenerationPage() {
 
                             if (event.step === "rag_retrieval") {
                                 setRAGStatus("Failed.");
+                            }
+
+                            if (event.step === "knowledge_graph_building") {
+                                setKGStatus("Failed.");
                             }
 
                             if (event.step === "pdf_generation") {
@@ -321,7 +339,7 @@ export default function CVGenerationPage() {
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 2.</span> RAG Retrieval </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <div className="generation-text"> Querying the vector database to get top-k similar documents from the vector database using cosine similarity.. </div>
+                            <div className="generation-text"> Querying the vector database to get top-k similar (to input job description) documents from the vector database using cosine similarity.. </div>
 
                             {!isRAGRetrievalSuccess && (<div className="loading-spinner" />)}
                         </div>
@@ -340,7 +358,25 @@ export default function CVGenerationPage() {
 
                 {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 3.</span> Tailored Resume Generation </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 3.</span> Knowledge Graph Creation </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <div className="generation-text"> Building knowledge graph from input resume.. </div>
+
+                            {!isKGBuildingSuccess && (<div className="loading-spinner" />)}
+                        </div>
+
+                        <div className="generation-text">{KGStatus}</div>
+
+                        {knowledgeGraph && (
+                            <KnowledgeGraphView graph={knowledgeGraph} />
+                        )}
+                    </>
+                )}
+
+                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && isKGBuildingSuccess && (
+                    <>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 4.</span> Tailored Resume Generation </div>
 
                         {/* <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
