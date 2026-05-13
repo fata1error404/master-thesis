@@ -386,7 +386,7 @@ export default function CVGenerationPage() {
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 3.</span> Knowledge Graph Creation </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <div className="generation-text"> Building knowledge graph from input resume.. </div>
+                            <div className="generation-text"> Building knowledge graph from input resume and job description.. </div>
 
                             {!isKGBuildingSuccess && (<div className="loading-spinner" />)}
                         </div>
@@ -394,7 +394,13 @@ export default function CVGenerationPage() {
                         <div className="generation-text">{KGStatus}</div>
 
                         {knowledgeGraph && (
-                            <KnowledgeGraphView graph={knowledgeGraph} />
+                            <>
+                                <div className="generation-text"> There are 10 node types: person, job, company, keyword, canonical skill, person skill, education, experience, project, certification. </div>
+
+                                <div className="generation-text"> A knowledge graph is built to connect a single person node and a single job node. This connection is established by first extracting keywords — raw key phrases from the resume and job description — and then mapping those keywords to canonical skills. Canonical skills serve as a shared vocabulary that allows the resume and job requirements to speak the same language, making it possible to identify and represent their connections. </div>
+
+                                <KnowledgeGraphView graph={knowledgeGraph} />
+                            </>
                         )}
                     </>
                 )}
