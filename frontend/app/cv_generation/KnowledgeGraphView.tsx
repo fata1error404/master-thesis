@@ -16,49 +16,73 @@ import dagre from "@dagrejs/dagre";
 
 import "@xyflow/react/dist/style.css";
 
+type KGNodeType =
+    | "person"
+    | "job"
+    | "company"
+    | "keyword"
+    | "canonical_skill"
+    | "person_skill"
+    | "education"
+    | "experience"
+    | "project"
+    | "certification";
+
 type KGNode = {
     id: string;
-    type: string;
+    type: KGNodeType;
     label: string;
-    meta?: Record<string, any> | null;
+    meta?: Record<string, unknown> | null;
 };
 
 type KGEdge = {
     source: string;
     target: string;
     relation: string;
+    weight?: number;
+    confidence?: number;
+    evidence?: string | null;
+    provenance?: string | null;
+    meta?: Record<string, unknown> | null;
 };
 
 type KnowledgeGraph = {
     nodes: KGNode[];
     edges: KGEdge[];
+    meta?: Record<string, unknown> | null;
 };
 
 type RFNodeData = KGNode;
 
-const NODE_WIDTH = 190;
-const NODE_HEIGHT = 86;
+const NODE_WIDTH = 210;
+const NODE_HEIGHT = 96;
 
 function KGNodeComponent({ data }: NodeProps<Node<RFNodeData>>) {
-    const colorMap: Record<string, string> = {
+    const colorMap: Record<KGNodeType, string> = {
+        person: "#7c3aed",
         job: "#6d28d9",
-        skill: "#2563eb",
+        company: "#475569",
+        keyword: "#52525b",
+        canonical_skill: "#334155",
+        person_skill: "#0f766e",
+        education: "#db2777",
         experience: "#059669",
         project: "#d97706",
-        education: "#db2777",
-        company: "#475569",
         certification: "#0f766e",
-        keyword: "#52525b",
     };
 
     const bg = colorMap[data.type] ?? "#1f2937";
+
+    const metaEntries = data.meta && typeof data.meta === "object"
+        ? Object.entries(data.meta).filter(([, v]) => v !== null && v !== undefined)
+        : [];
 
     return (
         <div
             style={{
                 width: NODE_WIDTH,
                 minHeight: NODE_HEIGHT,
-                padding: "0.75rem",
+                padding: "0.8rem",
                 borderRadius: "14px",
                 background: bg,
                 color: "#f3f4f6",
@@ -102,15 +126,13 @@ function KGNodeComponent({ data }: NodeProps<Node<RFNodeData>>) {
                 {data.label}
             </div>
 
-            {data.meta && Object.keys(data.meta).length > 0 && (
-                <div style={{ marginTop: "0.35rem", fontSize: "0.68rem", opacity: 0.85 }}>
-                    {Object.entries(data.meta)
-                        .slice(0, 2)
-                        .map(([k, v]) => (
-                            <div key={k}>
-                                {k}: {String(v)}
-                            </div>
-                        ))}
+            {metaEntries.length > 0 && (
+                <div style={{ marginTop: "0.4rem", fontSize: "0.68rem", opacity: 0.86 }}>
+                    {metaEntries.slice(0, 3).map(([k, v]) => (
+                        <div key={k}>
+                            {k}: {Array.isArray(v) ? v.length : String(v)}
+                        </div>
+                    ))}
                 </div>
             )}
 
@@ -137,8 +159,8 @@ function autoLayout(graph: KnowledgeGraph) {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     dagreGraph.setGraph({
         rankdir: "LR",
-        nodesep: 45,
-        ranksep: 110,
+        nodesep: 55,
+        ranksep: 120,
         marginx: 20,
         marginy: 20,
     });
@@ -167,23 +189,34 @@ function autoLayout(graph: KnowledgeGraph) {
         };
     });
 
-    const edges: Edge[] = graph.edges.map((e, i) => ({
-        id: `e-${i}-${e.source}-${e.target}`,
-        source: e.source,
-        target: e.target,
-        label: e.relation,
-        animated: true,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: {
-            stroke: "#8b8b8b",
-            strokeWidth: 1.6,
-        },
-        labelStyle: {
-            fill: "#d4d4d4",
-            fontSize: 11,
-            fontWeight: 600,
-        },
-    }));
+    const edges: Edge[] = graph.edges.map((e, i) => {
+        const confidence = typeof e.confidence === "number" ? e.confidence : 1;
+        const weight = typeof e.weight === "number" ? e.weight : 1;
+
+        return {
+            id: `e-${i}-${e.source}-${e.target}`,
+            source: e.source,
+            target: e.target,
+            label: e.relation,
+            animated: confidence >= 0.8,
+            markerEnd: { type: MarkerType.ArrowClosed },
+            style: {
+                stroke: confidence >= 0.8 ? "#9ca3af" : "#6b7280",
+                strokeWidth: Math.max(1.2, Math.min(3.2, weight * 2.2)),
+                opacity: Math.max(0.35, Math.min(1, confidence)),
+            },
+            labelStyle: {
+                fill: "#d4d4d4",
+                fontSize: 11,
+                fontWeight: 600,
+            },
+            labelBgStyle: {
+                fill: "#0b0b0b",
+                fillOpacity: 0.9,
+            },
+            labelBgPadding: [4, 2],
+        };
+    });
 
     return { nodes, edges };
 }
@@ -199,7 +232,7 @@ export default function KnowledgeGraphView({
         <div
             style={{
                 width: "100%",
-                height: "560px",
+                height: "620px",
                 marginTop: "1rem",
                 borderRadius: "16px",
                 overflow: "hidden",

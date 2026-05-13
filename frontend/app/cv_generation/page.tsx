@@ -27,8 +27,33 @@ export default function CVGenerationPage() {
 
     const [KGStatus, setKGStatus] = useState("");
     const [knowledgeGraph, setKnowledgeGraph] = useState<{
-        nodes: { id: string; type: string; label: string; meta?: Record<string, unknown> | null }[];
-        edges: { source: string; target: string; relation: string }[];
+        nodes: {
+            id: string;
+            type:
+            | "person"
+            | "job"
+            | "company"
+            | "keyword"
+            | "canonical_skill"
+            | "person_skill"
+            | "education"
+            | "experience"
+            | "project"
+            | "certification";
+            label: string;
+            meta?: Record<string, unknown> | null;
+        }[];
+        edges: {
+            source: string;
+            target: string;
+            relation: string;
+            weight?: number;
+            confidence?: number;
+            evidence?: string | null;
+            provenance?: string | null;
+            meta?: Record<string, unknown> | null;
+        }[];
+        meta?: Record<string, unknown> | null;
     } | null>(null);
     const [isKGBuildingSuccess, setIsKGBuildingSuccess] = useState(false);
 
