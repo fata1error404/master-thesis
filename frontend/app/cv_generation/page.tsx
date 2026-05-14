@@ -16,7 +16,7 @@ export default function CVGenerationPage() {
     const [jobCompanyName, setJobCompanyName] = useState("");
 
     const [resumeAnalysisStatus, setResumeAnalysisStatus] = useState("");
-    const [resumeJSON, setResumeJSON] = useState(null);
+    const [originalResumeJSON, setOriginalResumeJSON] = useState(null);
     const [isResumeExpanded, setIsResumeExpanded] = useState(false);
     const [isResumeExtractionSuccess, setIsResumeExtractionSuccess] = useState(false);
 
@@ -57,7 +57,9 @@ export default function CVGenerationPage() {
     } | null>(null);
     const [isKGBuildingSuccess, setIsKGBuildingSuccess] = useState(false);
 
-    const [isSectionGenerationSuccess, setIsSectionGenerationSuccess] = useState(false);
+    const [resumeTailoringStatus, setResumeTailoringStatus] = useState("");
+    const [tailoredResumeJSON, setTailoredResumeJSON] = useState(null);
+    const [isResumeTailoringSuccess, setIsResumeTailoringSuccess] = useState(false);
 
     const [pdfGenerationStatus, setPdfGenerationStatus] = useState("");
     const [newPdfURL, setNewPdfURL] = useState<string | null>(null);
@@ -190,8 +192,8 @@ export default function CVGenerationPage() {
                             setJobDescriptionAnalysisStatus("Done ✔️");
                         }
 
-                        if (event.type === "resume_data") {
-                            setResumeJSON(event.data);
+                        if (event.type === "resume_original_data") {
+                            setOriginalResumeJSON(event.data);
                             setIsResumeExtractionSuccess(true);
                             setResumeAnalysisStatus("Done ✔️");
                         }
@@ -208,7 +210,13 @@ export default function CVGenerationPage() {
                             setKGStatus("Done ✔️");
                         }
 
-                        if (event.type === "new_resume_data") {
+                        if (event.type === "resume_tailored_data") {
+                            setTailoredResumeJSON(event.data);
+                            setIsResumeTailoringSuccess(true);
+                            setResumeTailoringStatus("Done ✔️");
+                        }
+
+                        if (event.type === "resume_tailored_pdf") {
                             const new_base64 = event.data.new_pdf_content_base64;
                             const newBinary = atob(new_base64);
                             const newBytes = new Uint8Array(newBinary.length);
@@ -254,6 +262,10 @@ export default function CVGenerationPage() {
 
                             if (event.step === "knowledge_graph_building") {
                                 setKGStatus("Failed.");
+                            }
+
+                            if (event.step === "resume_tailoring") {
+                                setPdfGenerationStatus("Failed.");
                             }
 
                             if (event.step === "pdf_generation") {
@@ -326,7 +338,7 @@ export default function CVGenerationPage() {
 
                         <div className="generation-text">{resumeAnalysisStatus}</div>
 
-                        {resumeJSON && (
+                        {originalResumeJSON && (
                             <div className="container">
 
                                 <div className="container-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -349,7 +361,7 @@ export default function CVGenerationPage() {
                                     <JsonView
                                         className="json-text-box"
                                         style={vscodeTheme}
-                                        value={resumeJSON}
+                                        value={originalResumeJSON}
                                         enableClipboard={false}
                                         displayDataTypes={false}
                                     />
@@ -409,82 +421,86 @@ export default function CVGenerationPage() {
                     <>
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 4.</span> Tailored Resume Generation </div>
 
-                        {/* <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
 
-                            {!isSectionGenerationSuccess && (<div className="loading-spinner" />)}
-                        </div> */}
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <div className="generation-text"> Converting new resume: JSON to LaTeX to PDF.. </div>
-
-                            {!isPdfGenerationSuccess && (<div className="loading-spinner" />)}
+                            {!isResumeTailoringSuccess && (<div className="loading-spinner" />)}
                         </div>
 
-                        <div className="generation-text">{pdfGenerationStatus}</div>
-
-                        {newPdfURL && (
+                        {isResumeTailoringSuccess && (
                             <>
-                                <div style={{ display: "flex", alignItems: "center", marginTop: "2rem" }}>
-                                    {/* <img
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <div className="generation-text"> Converting new resume: JSON to LaTeX to PDF.. </div>
+
+                                    {!isPdfGenerationSuccess && (<div className="loading-spinner" />)}
+                                </div>
+
+                                <div className="generation-text">{pdfGenerationStatus}</div>
+
+                                {newPdfURL && (
+                                    <>
+                                        <div style={{ display: "flex", alignItems: "center", marginTop: "2rem" }}>
+                                            {/* <img
                                         src={"/icons/stars-ai.svg"}
                                         alt="ai icon"
                                         style={{ width: "35px", height: "35px", marginLeft: "1.5rem", marginRight: "0.4rem" }}
                                     /> */}
 
-                                    <div style={{
-                                        color: "white", fontSize: "1.8rem", fontWeight: "bold", marginLeft: "1rem"
-                                    }}> Tailored Resume </div>
+                                            <div style={{
+                                                color: "white", fontSize: "1.8rem", fontWeight: "bold", marginLeft: "1rem"
+                                            }}> Tailored Resume </div>
 
-                                    <button className="final-button" style={{ marginLeft: "auto" }} onClick={handleDownload}>
-                                        Download
+                                            <button className="final-button" style={{ marginLeft: "auto" }} onClick={handleDownload}>
+                                                Download
 
-                                        <img
-                                            src={"/icons/download.svg"}
-                                            alt="download icon"
-                                            style={{ width: "20px", height: "20px" }}
-                                        />
-                                    </button>
+                                                <img
+                                                    src={"/icons/download.svg"}
+                                                    alt="download icon"
+                                                    style={{ width: "20px", height: "20px" }}
+                                                />
+                                            </button>
 
-                                    <button className="final-button" style={{ marginLeft: "0.8rem" }} onClick={handleOpenCompare} ref={compareButtonRef}>
-                                        Compare
+                                            <button className="final-button" style={{ marginLeft: "0.8rem" }} onClick={handleOpenCompare} ref={compareButtonRef}>
+                                                Compare
 
-                                        <img
-                                            src={"/icons/compare.svg"}
-                                            alt="compare icon"
-                                            style={{ width: "20px", height: "20px" }}
-                                        />
-                                    </button>
+                                                <img
+                                                    src={"/icons/compare.svg"}
+                                                    alt="compare icon"
+                                                    style={{ width: "20px", height: "20px" }}
+                                                />
+                                            </button>
 
-                                    <button className="final-button" style={{ marginLeft: "0.8rem", fontWeight: "bold" }}>
-                                        Edit in Overleaf
+                                            <button className="final-button" style={{ marginLeft: "0.8rem", fontWeight: "bold" }}>
+                                                Edit in Overleaf
 
-                                        <img
-                                            src={"/icons/overleaf.png"}
-                                            alt="overleaf icon"
-                                            style={{ width: "20px", height: "20px" }}
-                                        />
-                                    </button>
-                                </div>
+                                                <img
+                                                    src={"/icons/overleaf.png"}
+                                                    alt="overleaf icon"
+                                                    style={{ width: "20px", height: "20px" }}
+                                                />
+                                            </button>
+                                        </div>
 
-                                <div style={{ background: "#212121", width: "100%", height: "0.5rem" }}></div>
+                                        <div style={{ background: "#212121", width: "100%", height: "0.5rem" }}></div>
 
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        aspectRatio: "1 / 1.414",
-                                        marginTop: "-1rem"
-                                    }}
-                                >
-                                    <iframe
-                                        src={`${newPdfURL}#toolbar=0`}
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            border: "none",
-                                        }}
-                                    />
-                                </div>
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                aspectRatio: "1 / 1.414",
+                                                marginTop: "-1rem"
+                                            }}
+                                        >
+                                            <iframe
+                                                src={`${newPdfURL}#toolbar=0`}
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    border: "none",
+                                                }}
+                                            />
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
                     </>

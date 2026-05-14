@@ -1132,8 +1132,9 @@ def build_knowledge_graph(job: JobDetails, resume: Resume) -> KnowledgeGraph:
 
     # Achievements
     for i, achievement in enumerate(resume.achievements_section):
+        ach_text = achievement.name
         ach_id = f"achievement_{i}"
-        ach_label = _shorten(achievement, 95)
+        ach_label = _shorten(ach_text, 95)
 
         builder.add_node(
             ach_id,
@@ -1141,7 +1142,7 @@ def build_knowledge_graph(job: JobDetails, resume: Resume) -> KnowledgeGraph:
             ach_label,
             meta={
                 "kind": "achievement",
-                "full_text": achievement,
+                "full_text": ach_text,
                 "order": i,
                 "best_match_score": 0.0,
                 "match_count": 0,
@@ -1152,7 +1153,7 @@ def build_knowledge_graph(job: JobDetails, resume: Resume) -> KnowledgeGraph:
         builder.add_edge(resume_id, ach_id, "has_achievement", weight=1.0, confidence=1.0)
         builder.match_requirement_and_skill_graph(
             evidence_id=ach_id,
-            evidence_text=achievement,
+            evidence_text=ach_text,
             parent_id=ach_id,
         )
 

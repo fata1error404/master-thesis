@@ -2,6 +2,7 @@ import re
 import json
 import fitz
 from pathlib import Path
+from typing import Any, Dict
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -22,8 +23,12 @@ structured_llm = llm.with_structured_output(
 )
 
 
-def extract_resume(resume_file_id: str, save_path: str | None = None) -> dict:
-    resume_path = Path("outputs") / f"{resume_file_id}.pdf"
+def extract_resume(
+    resume_file_id: str, 
+    output_dir: str
+) -> Dict[str, Any]:
+    
+    resume_path = Path(output_dir) / f"{resume_file_id}.pdf"
 
     if not resume_path.exists():
         raise FileNotFoundError(f"Resume PDF file not found: {resume_path}")
@@ -56,11 +61,12 @@ def extract_resume(resume_file_id: str, save_path: str | None = None) -> dict:
 
     data = json.loads(result.model_dump_json())
 
-    if save_path:
-        path = Path(save_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    json_path = output_path / "resume.json"
+
+    with json_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
     return data

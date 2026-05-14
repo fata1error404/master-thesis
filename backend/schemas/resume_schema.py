@@ -44,6 +44,8 @@ class Certification(BaseModel):
     by: str = Field(description="The organization or institution that issued the certification.")
     link: str = Field(description="A link to verify the certification.")
 
+class Achievement(BaseModel):
+    name: str = Field(description="The name of the achievement.")
 
 
 class Resume(BaseModel):
@@ -57,4 +59,4 @@ class Resume(BaseModel):
     skills_section: List[SkillSection] = Field(description="Skill sections, each containing a group of skills and competencies relevant to the job.")
     projects_section: List[Project] = Field(description="Project experiences, including project name, type, link, resources, dates, and description.")
     certifications_section: List[Certification] = Field(description="job relevant certifications that you have earned, including the name, issuing organization, and a link to verify the certification.")
-    achievements_section: List[str] = Field(description="job relevant key accomplishments, awards, or recognitions that demonstrate your skills and abilities.")
+    achievements_section: List[Achievement] = Field(description="job relevant key accomplishments, awards, or recognitions that demonstrate your skills and abilities.")

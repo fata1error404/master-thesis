@@ -21,14 +21,15 @@ from llm.job_details_extractor import extract_job_details
 from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
 from llm.knowledge_graph_builder import build_knowledge_graph
-from latex.json2pdf import json_to_pdf
+from llm.resume_builder import build_resume
 
 @dataclass
 class PipelineState:
     job_description: str
     job_context: str | None = None
     job_details: Dict[str, Any] | None = None
-    resume_data: Dict[str, Any] | None = None
+    resume_original_data: Dict[str, Any] | None = None
+    resume_tailored_data: Dict[str, Any] | None = None
     rag_context: Dict[str, Any] | None = None
     knowledge_graph: Dict[str, Any] | None = None
 
@@ -57,6 +58,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+OUTPUT_DIR = "outputs"
 
 BASE_DIR = Path(__file__).parent
 _next_dir = BASE_DIR / ".next"
@@ -107,7 +110,7 @@ async def tailor(request: TailorRequest):
             # state.job_details = await asyncio.to_thread(
             #     extract_job_details,
             #     state.job_description,
-            #     save_path="outputs/job_details.json"
+            #     OUTPUT_DIR
             # )
 
             yield json.dumps({
@@ -125,20 +128,20 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            state.resume_data = await asyncio.to_thread(
+            state.resume_original_data = await asyncio.to_thread(
                 open_file,
                 "outputs/resume.json"
             )
 
-            # state.resume_data = await asyncio.to_thread(
+            # state.resume_original_data = await asyncio.to_thread(
             #     extract_resume,
             #     request.resume_file_id,
-            #     save_path="outputs/resume.json"
+            #     OUTPUT_DIR
             # )
 
             yield json.dumps({
-                "type": "resume_data",
-                "data": state.resume_data,
+                "type": "resume_original_data",
+                "data": state.resume_original_data,
             }) + "\n"
 
             await asyncio.sleep(0)
@@ -177,7 +180,7 @@ async def tailor(request: TailorRequest):
             from schemas.resume_schema import Resume
 
             job_obj = JobDetails(**state.job_details)
-            resume_obj = Resume(**state.resume_data)
+            resume_obj = Resume(**state.resume_original_data)
 
             kg = build_knowledge_graph(job_obj, resume_obj)
             state.knowledge_graph = kg.model_dump()
@@ -193,6 +196,34 @@ async def tailor(request: TailorRequest):
             yield json.dumps({
                 "type": "error",
                 "step": "knowledge_graph_building",
+                "message": str(e)
+            }) + "\n"
+
+        try:
+            state.resume_tailored_data = await asyncio.to_thread(
+                open_file,
+                "outputs/resume_tailored.json"
+            )
+
+            # state.resume_tailored_data = await asyncio.to_thread(
+            #     build_resume,
+            #     state.job_details,
+            #     state.resume_original_data,
+            #     request.resume_file_id,
+            #     OUTPUT_DIR
+            # )
+
+            yield json.dumps({
+                "type": "resume_tailored_data",
+                "data": state.resume_tailored_data,
+            }) + "\n"
+
+            await asyncio.sleep(0)
+
+        except Exception as e:
+            yield json.dumps({
+                "type": "error",
+                "step": "resume_tailoring",
                 "message": str(e)
             }) + "\n"
 
@@ -215,7 +246,7 @@ async def tailor(request: TailorRequest):
             new_pdf_base64 = base64.b64encode(new_pdf_bytes).decode("utf-8")
 
             yield json.dumps({
-                "type": "new_resume_data",
+                "type": "resume_tailored_pdf",
                 "data": {
                     "original_pdf_content_base64": original_pdf_base64,
                     "new_pdf_content_base64": new_pdf_base64}

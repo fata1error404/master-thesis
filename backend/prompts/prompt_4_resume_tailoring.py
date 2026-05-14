@@ -57,8 +57,6 @@ Instructions:
         }}
     ],
 </example>
-
-{format_instructions}
 """
 
 
@@ -103,8 +101,6 @@ Instructions:
     [and So on ...]
     ],
 </example>
-
-{format_instructions}
 """
 
 
@@ -141,8 +137,6 @@ Instructions:
         and so on ...
     ]
 </example>
-  
-{format_instructions}
 """
 
 
@@ -194,8 +188,6 @@ Instructions:
         [and So on ...]
     ]
 </example>
-  
-{format_instructions}
 """
 
 
@@ -234,8 +226,6 @@ Instructions:
         ...
     ],
 </example>
-
-{format_instructions}
 """
 
 
@@ -271,6 +261,4 @@ Instructions:
         [and So on ...]
     ]
 </example>
-
-{format_instructions}
 """

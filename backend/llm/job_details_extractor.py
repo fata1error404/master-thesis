@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any, Dict
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -20,7 +21,11 @@ prompt = ChatPromptTemplate.from_messages([
 structured_llm = llm.with_structured_output(JobDetails)
 
 
-def extract_job_details(job_description: str, save_path: str | None = None) -> dict:
+def extract_job_details(
+    job_description: str, 
+    output_dir: str
+) -> Dict[str, Any]:
+    
     # combine prompt + structured output model into a single pipeline
     chain = prompt | structured_llm
 
@@ -31,11 +36,12 @@ def extract_job_details(job_description: str, save_path: str | None = None) -> d
     data = result.model_dump()
 
     # save to JSON
-    if save_path:
-        path = Path(save_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    json_path = output_path / "job_details.json"
+
+    with json_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
     return data
