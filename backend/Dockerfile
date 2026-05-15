@@ -5,6 +5,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple/ -r requirements.txt
 
+# RUN apt-get update && \
+#     apt-get install -y --no-install-recommends \
+#         texlive-xetex \
+#         lmodern && \
+#     rm -rf /var/lib/apt/lists/*
+
 COPY main.py .
 
 EXPOSE 8000

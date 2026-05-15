@@ -22,6 +22,7 @@ from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
 from llm.knowledge_graph_builder import build_knowledge_graph
 from llm.resume_builder import build_resume
+from latex.json2pdf import json_to_pdf
 
 @dataclass
 class PipelineState:
@@ -154,14 +155,14 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            # vector_db = app.state.resume_vector_db
+            vector_db = app.state.resume_vector_db
 
-            # state.rag_context = await asyncio.to_thread(
-            #     retrieve_rag_context,
-            #     vector_db,
-            #     state.job_details,
-            #     8
-            # )
+            state.rag_context = await asyncio.to_thread(
+                retrieve_rag_context,
+                vector_db,
+                state.job_details,
+                8
+            )
 
             yield json.dumps({
                 "type": "rag_context",
@@ -228,19 +229,19 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            # pdf_path = await asyncio.to_thread(
-            #     json_to_pdf,
-            #     "outputs/resume.json"
-            # )
-
             original_pdf_bytes = await asyncio.to_thread(
                 lambda: Path("outputs", f"{request.resume_file_id}.pdf").read_bytes()
             )
 
             original_pdf_base64 = base64.b64encode(original_pdf_bytes).decode("utf-8")
 
+            # new_pdf_path = await asyncio.to_thread(
+            #     json_to_pdf,
+            #     "/app/outputs/resume_tailored.json"
+            # )
+
             new_pdf_bytes = await asyncio.to_thread(
-                Path("outputs/CV.pdf").read_bytes
+                Path("outputs/resume_tailored.pdf").read_bytes
             )
 
             new_pdf_base64 = base64.b64encode(new_pdf_bytes).decode("utf-8")

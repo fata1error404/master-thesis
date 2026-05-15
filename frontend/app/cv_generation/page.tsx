@@ -429,8 +429,10 @@ export default function CVGenerationPage() {
 
                         {isResumeTailoringSuccess && (
                             <>
+                                <div className="generation-text"> Created new resume JSON. </div>
+
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <div className="generation-text"> Converting new resume: JSON to LaTeX to PDF.. </div>
+                                    <div className="generation-text"> Converting: JSON to LaTeX to PDF.. </div>
 
                                     {!isPdfGenerationSuccess && (<div className="loading-spinner" />)}
                                 </div>
@@ -470,7 +472,16 @@ export default function CVGenerationPage() {
                                                 />
                                             </button>
 
-                                            <button className="final-button" style={{ marginLeft: "0.8rem", fontWeight: "bold" }}>
+                                            <button
+                                                className="final-button"
+                                                style={{ marginLeft: "0.8rem", fontWeight: "bold" }}
+                                                onClick={() => {
+                                                    window.open(
+                                                        "https://www.overleaf.com/docs?snip_uri=https://github.com/user-attachments/files/27800280/overleaf.zip",
+                                                        "_blank"
+                                                    );
+                                                }}
+                                            >
                                                 Edit in Overleaf
 
                                                 <img
