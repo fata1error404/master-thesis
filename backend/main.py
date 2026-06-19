@@ -23,7 +23,9 @@ from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
 from llm.knowledge_graph_builder import build_knowledge_graph
 from llm.resume_builder import build_resume
+from llm.metric_job_alignment import compute_job_alignment
 from llm.metric_content_preservation import compute_content_preservation
+from llm.metric_structural_validity import compute_structural_validity
 from latex.json2pdf import json_to_pdf
 
 @dataclass
@@ -269,6 +271,18 @@ async def tailor(request: TailorRequest):
         try:
             generation_time = time.perf_counter() - generation_start
 
+            job_alignment = await asyncio.to_thread(
+                compute_job_alignment,
+                state.job_details,
+                state.resume_tailored_data,
+            )
+
+            temp = await asyncio.to_thread(
+                compute_job_alignment,
+                state.job_details,
+                state.resume_original_data,
+            )
+
             content_preservation = await asyncio.to_thread(
                 compute_content_preservation,
                 state.job_details,
@@ -277,14 +291,33 @@ async def tailor(request: TailorRequest):
                 state.knowledge_graph,
             )
 
+            structural_validity = await asyncio.to_thread(
+                compute_structural_validity,
+                state.resume_tailored_data,
+            )
+
             # print(content_preservation["skill_overlap"])
             # print(content_preservation["semantic_similarity"])
+
+            improvement_based_utility = (
+                (
+                    job_alignment["job_alignment"]
+                    - temp["job_alignment"]
+                )
+                * content_preservation["content_preservation"]
+            )
 
             yield json.dumps({
                 "type": "metrics_data",
                 "data": {
                     "generation_time": generation_time,
+                    "job_alignment": job_alignment,
                     "content_preservation": content_preservation,
+                    "improvement_based_utility": {
+                        "improvement_based_utility": improvement_based_utility,
+                        "temp": temp,
+                    },
+                    "structural_validity": structural_validity
                 }
             }) + "\n"
 

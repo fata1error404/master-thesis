@@ -69,6 +69,9 @@ export default function CVGenerationPage() {
     const [metric1, setMetric1] = useState<number | null>(null);
     const [metric2, setMetric2] = useState<number | null>(null);
     const [metric3, setMetric3] = useState<number | null>(null);
+    const [metric4, setMetric4] = useState<number | null>(null);
+    const [metric5, setMetric5] = useState<number | null>(null);
+    const [metric6, setMetric6] = useState<number | null>(null);
     const [isMetricCalculationSuccess, setIsMetricCalculationSuccess] = useState(false);
 
     const [isComparePopupOpen, setIsComparePopupOpen] = useState(false);
@@ -256,6 +259,9 @@ export default function CVGenerationPage() {
                             setMetric1(event.data.generation_time);
                             setMetric2(event.data.job_alignment.job_alignment);
                             setMetric3(event.data.content_preservation.content_preservation);
+                            setMetric4(event.data.improvement_based_utility.temp.job_alignment);
+                            setMetric5(event.data.improvement_based_utility.improvement_based_utility);
+                            setMetric6(event.data.structural_validity.structural_validity);
                             setIsMetricCalculationSuccess(true);
                         }
 
@@ -540,18 +546,30 @@ export default function CVGenerationPage() {
                         </div>
                         )}
 
-                        {isMetricCalculationSuccess && metric1 !== null && metric2 != null && metric3 != null && (
+                        {isMetricCalculationSuccess && metric1 !== null && metric2 != null && metric3 != null && metric4 != null && metric5 != null && metric6 != null && (
                             <>
                                 <div className="metric-text">
                                     Generation time: <span style={{ color: "white" }}> {metric1.toFixed(2)} seconds </span>
                                 </div>
 
                                 <div className="metric-text">
-                                    Job alignment: <span style={{ color: "white" }}> {metric2.toFixed(3)} </span>
+                                    Content preservation: <span style={{ color: "white" }}> {metric3.toFixed(3)} </span>
                                 </div>
 
                                 <div className="metric-text">
-                                    Content preservation: <span style={{ color: "white" }}> {metric3.toFixed(3)} </span>
+                                    Job alignment: <span style={{ color: "white" }}> {metric2.toFixed(3)} </span>
+                                </div>
+
+                                <div className="metric-text" style={{ fontSize: "0.8rem", marginTop: "-0.7rem" }}>
+                                    (original value <span style={{ color: "white" }}>{metric4.toFixed(3)}</span>)
+                                </div>
+
+                                <div className="metric-text">
+                                    Improvement based utility: <span style={{ color: "white" }}> {metric5.toFixed(2)} </span>
+                                </div>
+
+                                <div className="metric-text">
+                                    Structural validity: <span style={{ color: "white" }}> {metric6.toFixed(1)} </span>
                                 </div>
                             </>
                         )}
