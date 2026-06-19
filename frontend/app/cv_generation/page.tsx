@@ -66,6 +66,9 @@ export default function CVGenerationPage() {
     const [originalPdfURL, setOriginalPdfURL] = useState<string | null>(null);
     const [isPdfGenerationSuccess, setIsPdfGenerationSuccess] = useState(false);
 
+    const [metric1, setMetric1] = useState<number | null>(null);
+    const [isMetricCalculationSuccess, setIsMetricCalculationSuccess] = useState(false);
+
     const [isComparePopupOpen, setIsComparePopupOpen] = useState(false);
     const [isComparePopupReady, setIsComparePopupReady] = useState(false);
 
@@ -245,6 +248,11 @@ export default function CVGenerationPage() {
 
                             setIsPdfGenerationSuccess(true);
                             setPdfGenerationStatus("Done ✔️");
+                        }
+
+                        if (event.type === "metrics_data") {
+                            setMetric1(event.data.generation_time);
+                            setIsMetricCalculationSuccess(true);
                         }
 
                         if (event.type === "error") {
@@ -513,6 +521,25 @@ export default function CVGenerationPage() {
                                     </>
                                 )}
                             </>
+                        )}
+                    </>
+                )}
+
+                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && isKGBuildingSuccess && isPdfGenerationSuccess && (
+                    <>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Metrics </div>
+
+                        {!isMetricCalculationSuccess && (<div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <div className="generation-text"> Evaluating generation.. </div>
+
+                            <div className="loading-spinner" />
+                        </div>
+                        )}
+
+                        {isMetricCalculationSuccess && metric1 !== null && (
+                            <div className="metric-text">
+                                Generation time: <span style={{ color: "white" }}> {metric1.toFixed(2)} seconds </span>
+                            </div>
                         )}
                     </>
                 )}

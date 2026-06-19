@@ -291,6 +291,13 @@ main {
   margin-top: -0.2rem;
 }
 
+.metric-text {
+  color: #b0b0b0;
+  font-size: 1.1rem;
+  font-family: monospace;
+  margin-left: 1rem;
+}
+
 .expand-button {
   background: transparent;
   border: none;

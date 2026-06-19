@@ -1,3 +1,4 @@
+import time
 import json
 import asyncio
 import base64
@@ -98,6 +99,8 @@ async def upload(file: UploadFile = File(...)):
 @app.post("/api/tailor")
 async def tailor(request: TailorRequest):
     async def event_stream():
+        generation_start = time.perf_counter()
+
         state = PipelineState(job_description=request.job_description)
 
         state = introduce_context(state)
@@ -259,6 +262,25 @@ async def tailor(request: TailorRequest):
             yield json.dumps({
                 "type": "error",
                 "step": "pdf_generation",
+                "message": str(e)
+            }) + "\n"
+
+        try:
+            generation_time = time.perf_counter() - generation_start
+            print("HELLO 1")
+
+            yield json.dumps({
+                "type": "metrics_data",
+                "data": {
+                    "generation_time": generation_time}
+            }) + "\n"
+
+            await asyncio.sleep(0)
+
+        except Exception as e:
+            yield json.dumps({
+                "type": "error",
+                "step": "metrics_calculation",
                 "message": str(e)
             }) + "\n"
 
