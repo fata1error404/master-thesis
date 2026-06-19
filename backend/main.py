@@ -23,6 +23,7 @@ from llm.resume_extractor import extract_resume
 from llm.rag_retriever import retrieve_rag_context
 from llm.knowledge_graph_builder import build_knowledge_graph
 from llm.resume_builder import build_resume
+from llm.metric_content_preservation import compute_content_preservation
 from latex.json2pdf import json_to_pdf
 
 @dataclass
@@ -267,12 +268,24 @@ async def tailor(request: TailorRequest):
 
         try:
             generation_time = time.perf_counter() - generation_start
-            print("HELLO 1")
+
+            content_preservation = await asyncio.to_thread(
+                compute_content_preservation,
+                state.job_details,
+                state.resume_original_data,
+                state.resume_tailored_data,
+                state.knowledge_graph,
+            )
+
+            # print(content_preservation["skill_overlap"])
+            # print(content_preservation["semantic_similarity"])
 
             yield json.dumps({
                 "type": "metrics_data",
                 "data": {
-                    "generation_time": generation_time}
+                    "generation_time": generation_time,
+                    "content_preservation": content_preservation,
+                }
             }) + "\n"
 
             await asyncio.sleep(0)

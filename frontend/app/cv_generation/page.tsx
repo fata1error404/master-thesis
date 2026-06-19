@@ -67,6 +67,8 @@ export default function CVGenerationPage() {
     const [isPdfGenerationSuccess, setIsPdfGenerationSuccess] = useState(false);
 
     const [metric1, setMetric1] = useState<number | null>(null);
+    const [metric2, setMetric2] = useState<number | null>(null);
+    const [metric3, setMetric3] = useState<number | null>(null);
     const [isMetricCalculationSuccess, setIsMetricCalculationSuccess] = useState(false);
 
     const [isComparePopupOpen, setIsComparePopupOpen] = useState(false);
@@ -252,6 +254,8 @@ export default function CVGenerationPage() {
 
                         if (event.type === "metrics_data") {
                             setMetric1(event.data.generation_time);
+                            setMetric2(event.data.job_alignment.job_alignment);
+                            setMetric3(event.data.content_preservation.content_preservation);
                             setIsMetricCalculationSuccess(true);
                         }
 
@@ -536,10 +540,20 @@ export default function CVGenerationPage() {
                         </div>
                         )}
 
-                        {isMetricCalculationSuccess && metric1 !== null && (
-                            <div className="metric-text">
-                                Generation time: <span style={{ color: "white" }}> {metric1.toFixed(2)} seconds </span>
-                            </div>
+                        {isMetricCalculationSuccess && metric1 !== null && metric2 != null && metric3 != null && (
+                            <>
+                                <div className="metric-text">
+                                    Generation time: <span style={{ color: "white" }}> {metric1.toFixed(2)} seconds </span>
+                                </div>
+
+                                <div className="metric-text">
+                                    Job alignment: <span style={{ color: "white" }}> {metric2.toFixed(3)} </span>
+                                </div>
+
+                                <div className="metric-text">
+                                    Content preservation: <span style={{ color: "white" }}> {metric3.toFixed(3)} </span>
+                                </div>
+                            </>
                         )}
                     </>
                 )}
