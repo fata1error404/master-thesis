@@ -9,6 +9,23 @@ export default function Home() {
   const textInputRef = useRef<HTMLDivElement | null>(null);
   const [jobDescriptionText, setJobText] = useState("");
   const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
+  const [enableRAG, setEnableRAG] = useState(true);
+  const [enableKnowledgeGraph, setEnableKnowledgeGraph] = useState(true);
+  const [settingsTooltip, setSettingsTooltip] = useState<{
+    text: string;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const showSettingsTooltip = (e: React.MouseEvent<HTMLImageElement>, text: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    setSettingsTooltip({
+      text,
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  };
 
   const handleJobInput = (e: React.FormEvent<HTMLElement>) => {
     const el = e.currentTarget;
@@ -93,6 +110,8 @@ export default function Home() {
     localStorage.setItem("job_description", jobDescriptionText);
     localStorage.setItem("resume_file_id", data.id);
     localStorage.setItem("resume_file_name", file.name.replace(/\.pdf$/i, ""));
+    localStorage.setItem("enable_rag", String(enableRAG));
+    localStorage.setItem("enable_knowledge_graph", String(enableKnowledgeGraph));
 
     router.push("/cv_generation");
   };
@@ -210,6 +229,68 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="container">
+          <div className="container-header">
+            Settings
+
+            <div className="settings-row">
+              <div className="settings-label-wrapper">
+                <div className="settings-label-text">Enable retrieval-augmented generation (RAG)</div>
+
+                <div className="settings-tooltip">
+                  <img
+                    src="/icons/question-mark.svg"
+                    alt="RAG setting info"
+                    className="settings-tooltip-icon"
+                    onMouseEnter={(e) => showSettingsTooltip(
+                      e,
+                      "Use high-quality reference resumes from our database as additional context. It is expected to improve the tailoring quality."
+                    )}
+                    onMouseLeave={() => setSettingsTooltip(null)}
+                  />
+                </div>
+              </div>
+
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={enableRAG}
+                  onChange={(e) => setEnableRAG(e.target.checked)}
+                />
+                <span className="switch-slider" />
+              </label>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-label-wrapper">
+                <div className="settings-label-text">Enable knowledge graph</div>
+
+                <div className="settings-tooltip">
+                  <img
+                    src="/icons/question-mark.svg"
+                    alt="knowledge graph setting info"
+                    className="settings-tooltip-icon"
+                    onMouseEnter={(e) => showSettingsTooltip(
+                      e,
+                      "Use input resume-job graph as additional context. It is expected to ensure generated content is tied to evidence from the source resume, reducing hallucinations."
+                    )}
+                    onMouseLeave={() => setSettingsTooltip(null)}
+                  />
+                </div>
+              </div>
+
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={enableKnowledgeGraph}
+                  onChange={(e) => setEnableKnowledgeGraph(e.target.checked)}
+                />
+                <span className="switch-slider" />
+              </label>
+            </div>
+          </div>
+        </div>
+
         <button
           className="submit-button"
           disabled={isSubmitDisabled}
@@ -218,6 +299,18 @@ export default function Home() {
           Generate
         </button>
       </main >
+
+      {settingsTooltip && (
+        <div
+          className="settings-floating-tooltip"
+          style={{
+            top: `${settingsTooltip.top}px`,
+            left: `${settingsTooltip.left}px`,
+          }}
+        >
+          {settingsTooltip.text}
+        </div>
+      )}
     </>
   );
 }

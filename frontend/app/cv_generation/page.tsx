@@ -24,6 +24,7 @@ export default function CVGenerationPage() {
     const [RAGContextCount, setRAGContextCount] = useState(null);
     const [isRAGExpanded, setIsRAGExpanded] = useState(false);
     const [isRAGRetrievalSuccess, setIsRAGRetrievalSuccess] = useState(false);
+    const [isRAGEnabled, setIsRAGEnabled] = useState(true);
 
     const [KGStatus, setKGStatus] = useState("");
     const [knowledgeGraph, setKnowledgeGraph] = useState<{
@@ -56,6 +57,7 @@ export default function CVGenerationPage() {
         meta?: Record<string, unknown> | null;
     } | null>(null);
     const [isKGBuildingSuccess, setIsKGBuildingSuccess] = useState(false);
+    const [isKnowledgeGraphEnabled, setIsKnowledgeGraphEnabled] = useState(true);
 
     const [resumeTailoringStatus, setResumeTailoringStatus] = useState("");
     const [tailoredResumeJSON, setTailoredResumeJSON] = useState(null);
@@ -88,6 +90,10 @@ export default function CVGenerationPage() {
         width: 0,
         height: 0,
     });
+
+    const ragStepNumber = 2;
+    const knowledgeGraphStepNumber = isRAGEnabled ? 3 : 2;
+    const resumeGenerationStepNumber = 2 + Number(isRAGEnabled) + Number(isKnowledgeGraphEnabled);
 
     const handleOpenCompare = () => {
         const rect = compareButtonRef.current?.getBoundingClientRect();
@@ -155,6 +161,11 @@ export default function CVGenerationPage() {
 
         const jobDescriptionText = localStorage.getItem("job_description");
         const resumeFileID = localStorage.getItem("resume_file_id");
+        const enableRAG = localStorage.getItem("enable_rag") !== "false";
+        const enableKnowledgeGraph = localStorage.getItem("enable_knowledge_graph") !== "false";
+
+        setIsRAGEnabled(enableRAG);
+        setIsKnowledgeGraphEnabled(enableKnowledgeGraph);
 
         if (!jobDescriptionText || !resumeFileID) return;
 
@@ -168,6 +179,8 @@ export default function CVGenerationPage() {
                     body: JSON.stringify({
                         resume_file_id: resumeFileID,
                         job_description: jobDescriptionText,
+                        enable_rag: enableRAG,
+                        enable_knowledge_graph: enableKnowledgeGraph,
                     }),
                 });
 
@@ -210,15 +223,23 @@ export default function CVGenerationPage() {
                         }
 
                         if (event.type === "rag_context") {
-                            setRAGContextCount(event.data);
+                            const ragData = event.data && typeof event.data === "object" ? event.data : null;
+                            const ragEnabled = ragData && "enabled" in ragData ? Boolean(ragData.enabled) : true;
+                            const retrievedCount = ragData && "retrieved_count" in ragData ? Number(ragData.retrieved_count) : event.data;
+
+                            setRAGContextCount(retrievedCount);
                             setIsRAGRetrievalSuccess(true);
-                            setRAGStatus("Done ✔️");
+                            setRAGStatus(ragEnabled ? "Done ✔️" : "Skipped.");
                         }
 
                         if (event.type === "knowledge_graph") {
-                            setKnowledgeGraph(event.data);
+                            const kgData = event.data && typeof event.data === "object" ? event.data : null;
+                            const kgEnabled = kgData && "enabled" in kgData ? Boolean(kgData.enabled) : true;
+                            const graph = kgData && "graph" in kgData ? kgData.graph : event.data;
+
+                            setKnowledgeGraph(graph);
                             setIsKGBuildingSuccess(true);
-                            setKGStatus("Done ✔️");
+                            setKGStatus(kgEnabled ? "Done ✔️" : "Skipped.");
                         }
 
                         if (event.type === "resume_tailored_data") {
@@ -395,9 +416,9 @@ export default function CVGenerationPage() {
                     </>
                 )}
 
-                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (
+                {isRAGEnabled && isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 2.</span> RAG Retrieval </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step {ragStepNumber}.</span> RAG Retrieval </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Querying the vector database to get top-k similar (to input job description) documents from the vector database using cosine similarity.. </div>
@@ -417,9 +438,9 @@ export default function CVGenerationPage() {
                     </>
                 )}
 
-                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && (
+                {isKnowledgeGraphEnabled && isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (!isRAGEnabled || isRAGRetrievalSuccess) && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 3.</span> Knowledge Graph Creation </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step {knowledgeGraphStepNumber}.</span> Knowledge Graph Creation </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Building knowledge graph from input resume and job description.. </div>
@@ -441,9 +462,9 @@ export default function CVGenerationPage() {
                     </>
                 )}
 
-                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && isKGBuildingSuccess && (
+                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (!isRAGEnabled || isRAGRetrievalSuccess) && (!isKnowledgeGraphEnabled || isKGBuildingSuccess) && (
                     <>
-                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step 4.</span> Tailored Resume Generation </div>
+                        <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> <span style={{ textDecoration: "underline" }}>Step {resumeGenerationStepNumber}.</span> Tailored Resume Generation </div>
 
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <div className="generation-text"> Tailoring sections: work experience, education, skills, projects, certifications, achievements.. </div>
@@ -541,7 +562,7 @@ export default function CVGenerationPage() {
                     </>
                 )}
 
-                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && isRAGRetrievalSuccess && isKGBuildingSuccess && isPdfGenerationSuccess && (
+                {isJobDetailsExtractionSuccess && isResumeExtractionSuccess && (!isRAGEnabled || isRAGRetrievalSuccess) && (!isKnowledgeGraphEnabled || isKGBuildingSuccess) && isPdfGenerationSuccess && (
                     <>
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Metrics </div>
 

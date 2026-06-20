@@ -55,6 +55,8 @@ app = FastAPI(lifespan=lifespan)
 class TailorRequest(BaseModel):
     resume_file_id: str
     job_description: str
+    enable_rag: bool = True
+    enable_knowledge_graph: bool = True
 
 
 app.add_middleware(
@@ -162,18 +164,30 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            vector_db = app.state.resume_vector_db
+            if request.enable_rag:
+                vector_db = app.state.resume_vector_db
 
-            state.rag_context = await asyncio.to_thread(
-                retrieve_rag_context,
-                vector_db,
-                state.job_details,
-                8
-            )
+                state.rag_context = await asyncio.to_thread(
+                    retrieve_rag_context,
+                    vector_db,
+                    state.job_details,
+                    8
+                )
+
+                rag_data = {
+                    "enabled": True,
+                    "retrieved_count": state.rag_context.get("retrieved_count", 0),
+                }
+            else:
+                state.rag_context = None
+                rag_data = {
+                    "enabled": False,
+                    "retrieved_count": 0,
+                }
 
             yield json.dumps({
                 "type": "rag_context",
-                "data": 8,
+                "data": rag_data,
             }) + "\n"
 
         except Exception as e:
@@ -184,18 +198,24 @@ async def tailor(request: TailorRequest):
             }) + "\n"
 
         try:
-            from schemas.job_details_schema import JobDetails
-            from schemas.resume_schema import Resume
+            if request.enable_knowledge_graph:
+                from schemas.job_details_schema import JobDetails
+                from schemas.resume_schema import Resume
 
-            job_obj = JobDetails(**state.job_details)
-            resume_obj = Resume(**state.resume_original_data)
+                job_obj = JobDetails(**state.job_details)
+                resume_obj = Resume(**state.resume_original_data)
 
-            kg = build_knowledge_graph(job_obj, resume_obj)
-            state.knowledge_graph = kg.model_dump()
+                kg = build_knowledge_graph(job_obj, resume_obj)
+                state.knowledge_graph = kg.model_dump()
+            else:
+                state.knowledge_graph = None
 
             yield json.dumps({
                 "type": "knowledge_graph",
-                "data": state.knowledge_graph
+                "data": {
+                    "enabled": request.enable_knowledge_graph,
+                    "graph": state.knowledge_graph,
+                }
             }) + "\n"
 
             await asyncio.sleep(0)
