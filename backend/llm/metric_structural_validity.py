@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from schemas.resume_schema import Resume
 
+# [TODO] annotation
 
 class BulletValidityScores(BaseModel):
     scores: List[int] = Field(

@@ -12,6 +12,7 @@ from schemas.job_details_schema import JobDetails
 from schemas.knowledge_graph import KnowledgeGraph
 from schemas.resume_schema import Resume
 
+# [TODO] annotation
 
 ALPHA = 0.45
 BETA = 0.35

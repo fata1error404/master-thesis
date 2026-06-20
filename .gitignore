@@ -13,3 +13,5 @@ frontend/.next/
 frontend/node_modules/
 reference/
 .env
+.agents/
+.codex/

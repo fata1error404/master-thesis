@@ -72,6 +72,9 @@ export default function CVGenerationPage() {
     const [metric4, setMetric4] = useState<number | null>(null);
     const [metric5, setMetric5] = useState<number | null>(null);
     const [metric6, setMetric6] = useState<number | null>(null);
+    const [metricReference1, setMetricReference1] = useState<number | null>(null);
+    const [metricReference2, setMetricReference2] = useState<number | null>(null);
+    const [metricReference3, setMetricReference3] = useState<number | null>(null);
     const [isMetricCalculationSuccess, setIsMetricCalculationSuccess] = useState(false);
 
     const [isComparePopupOpen, setIsComparePopupOpen] = useState(false);
@@ -262,6 +265,9 @@ export default function CVGenerationPage() {
                             setMetric4(event.data.improvement_based_utility.temp.job_alignment);
                             setMetric5(event.data.improvement_based_utility.improvement_based_utility);
                             setMetric6(event.data.structural_validity.structural_validity);
+                            setMetricReference1(event.data.resume_flow.job_alignment_new);
+                            setMetricReference2(event.data.resume_flow.job_alignment_orig);
+                            setMetricReference3(event.data.resume_flow.content_preservation);
                             setIsMetricCalculationSuccess(true);
                         }
 
@@ -540,13 +546,13 @@ export default function CVGenerationPage() {
                         <div className="generation-header-text" style={{ marginTop: "1.5rem" }}> Metrics </div>
 
                         {!isMetricCalculationSuccess && (<div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <div className="generation-text"> Evaluating generation.. </div>
+                            <div className="generation-text"> Evaluating new tailored resume.. </div>
 
                             <div className="loading-spinner" />
                         </div>
                         )}
 
-                        {isMetricCalculationSuccess && metric1 !== null && metric2 != null && metric3 != null && metric4 != null && metric5 != null && metric6 != null && (
+                        {isMetricCalculationSuccess && metric1 !== null && metric2 != null && metric3 != null && metric4 != null && metric5 != null && metric6 != null && metricReference1 != null && metricReference2 != null && metricReference3 != null && (
                             <>
                                 <div className="metric-text">
                                     Generation time: <span style={{ color: "white" }}> {metric1.toFixed(2)} seconds </span>
@@ -570,6 +576,22 @@ export default function CVGenerationPage() {
 
                                 <div className="metric-text">
                                     Structural validity: <span style={{ color: "white" }}> {metric6.toFixed(1)} </span>
+                                </div>
+
+                                <div className="generation-header-text" style={{ fontSize: "1rem", marginTop: "1.5rem" }}>
+                                    Using metric definitions from the ResumeFlow paper (for research):
+                                </div>
+
+                                <div className="metric-text">
+                                    Content preservation: <span style={{ color: "white" }}> {metricReference3.toFixed(3)} </span>
+                                </div>
+
+                                <div className="metric-text">
+                                    Job alignment: <span style={{ color: "white" }}> {metricReference1.toFixed(3)} </span>
+                                </div>
+
+                                <div className="metric-text" style={{ fontSize: "0.8rem", marginTop: "-0.7rem" }}>
+                                    (original value <span style={{ color: "white" }}>{metricReference2.toFixed(3)}</span>)
                                 </div>
                             </>
                         )}

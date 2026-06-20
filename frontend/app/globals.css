@@ -450,3 +450,16 @@ main {
   margin-top: 0.5rem;
   overflow: hidden;
 }
+
+.kg-container:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0px;
+  margin-top: 0px;
+}
+
+.kg-fullscreen-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}

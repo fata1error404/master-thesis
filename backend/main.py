@@ -26,6 +26,7 @@ from llm.resume_builder import build_resume
 from llm.metric_job_alignment import compute_job_alignment
 from llm.metric_content_preservation import compute_content_preservation
 from llm.metric_structural_validity import compute_structural_validity
+from llm.metric_resume_flow import compute_resume_flow_metrics
 from latex.json2pdf import json_to_pdf
 
 @dataclass
@@ -296,6 +297,13 @@ async def tailor(request: TailorRequest):
                 state.resume_tailored_data,
             )
 
+            resume_flow = await asyncio.to_thread(
+                compute_resume_flow_metrics,
+                state.job_details,
+                state.resume_original_data,
+                state.resume_tailored_data,
+            )
+
             # print(content_preservation["skill_overlap"])
             # print(content_preservation["semantic_similarity"])
 
@@ -317,7 +325,8 @@ async def tailor(request: TailorRequest):
                         "improvement_based_utility": improvement_based_utility,
                         "temp": temp,
                     },
-                    "structural_validity": structural_validity
+                    "structural_validity": structural_validity,
+                    "resume_flow": resume_flow
                 }
             }) + "\n"
 

@@ -1,11 +1,14 @@
 "use client";
 
+import { useRef, useState, useEffect } from "react";
 import { useMemo } from "react";
 import {
     ReactFlow,
     Handle,
     Position,
     MarkerType,
+    Panel,
+    type ReactFlowInstance,
     type Node,
     type Edge,
     type NodeProps,
@@ -54,9 +57,12 @@ type KnowledgeGraph = {
 type RFNodeData = KGNode;
 
 const NODE_WIDTH = 210;
-const NODE_HEIGHT = 96;
+const NODE_HEIGHT = 15;
 const CANONICAL_NODE_HEIGHT = 50;
 const CANONICAL_GAP = 34;
+const TYPE_NODE_GAP = 42;
+const TYPE_BLOCK_GAP = 36;
+const ANCHOR_NODE_RENDERED_HEIGHT = 126;
 
 const HANDLE_STYLES = {
     width: 8,
@@ -79,6 +85,57 @@ function getNodeHeight(type: KGNodeType) {
     return type === "canonical_skill" ? CANONICAL_NODE_HEIGHT : NODE_HEIGHT;
 }
 
+function isAnchorNodeType(type: KGNodeType) {
+    return type === "person" || type === "job";
+}
+
+function getVisibleMetaEntries(node: KGNode): [string, unknown][] {
+    if (node.type === "canonical_skill") return [];
+
+    const meta = node.meta;
+    if (!meta || typeof meta !== "object") return [];
+
+    return Object.entries(meta).filter(
+        ([key, value]) => !key.startsWith("__") && value !== null && value !== undefined
+    );
+}
+
+function estimateWrappedLines(text: string, charsPerLine: number) {
+    return Math.max(1, Math.ceil(text.length / charsPerLine));
+}
+
+function getLayoutNodeHeight(node: KGNode) {
+    if (node.type === "canonical_skill") {
+        return CANONICAL_NODE_HEIGHT;
+    }
+
+    const metaEntries = getVisibleMetaEntries(node);
+    const labelLines = estimateWrappedLines(node.label, 18);
+    const metaLineCount = metaEntries
+        .slice(0, 3)
+        .reduce((sum, [k, v]) => {
+            const displayValue = Array.isArray(v) ? String(v.length) : String(v);
+            return sum + estimateWrappedLines(`${k}: ${displayValue}`, 24);
+        }, 0);
+
+    const baseHeight = NODE_HEIGHT;
+    const labelExtra = (labelLines - 1) * 18;
+    const metaExtra = metaLineCount > 0 ? 8 + metaLineCount * 16 : 0;
+
+    return Math.max(baseHeight, baseHeight + labelExtra + metaExtra);
+}
+
+function median(values: number[]) {
+    if (values.length === 0) return 0;
+
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+
+    return sorted.length % 2 === 0
+        ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+        : Math.round(sorted[mid]);
+}
+
 function getSourceHandleId(sourceType: KGNodeType): string | undefined {
     if (sourceType === "canonical_skill") return undefined;
     if (sourceType === "job") return "source-left";
@@ -88,9 +145,10 @@ function getSourceHandleId(sourceType: KGNodeType): string | undefined {
 
 function getTargetHandleId(sourceType: KGNodeType, targetType: KGNodeType): string | undefined {
     if (targetType === "canonical_skill") {
-        return sourceType === "job" ? "target-left" : "target-left";
+        return sourceType === "job" ? "target-right" : "target-left";
     }
 
+    if (targetType === "company") return undefined;
     if (targetType === "job") return "target-left";
     if (targetType === "person") return undefined;
 
@@ -99,55 +157,71 @@ function getTargetHandleId(sourceType: KGNodeType, targetType: KGNodeType): stri
 
 function KGNodeComponent({ data }: NodeProps<Node<RFNodeData>>) {
     const colorMap: Record<KGNodeType, string> = {
-        person: "#7c3aed",
-        job: "#6d28d9",
+        person: "#259998",
+        job: "#259998",
         company: "#475569",
         keyword: "#52525b",
         canonical_skill: "#334155",
         person_skill: "#0f766e",
-        education: "#db2777",
-        experience: "#059669",
-        project: "#d97706",
+        education: "#c99f3b",
+        experience: "#d97706",
+        project: "#059669",
         certification: "#0f766e",
     };
 
     const bg = colorMap[data.type] ?? "#1f2937";
-    const nodeHeight = getNodeHeight(data.type);
+    const nodeHeight = getLayoutNodeHeight(data);
 
-    const metaEntries =
-        data.type === "canonical_skill"
-            ? []
-            : data.meta && typeof data.meta === "object"
-                ? Object.entries(data.meta).filter(([, v]) => v !== null && v !== undefined)
-                : [];
+    const metaEntries = getVisibleMetaEntries(data);
+
+    const canonicalMeta = data.meta && typeof data.meta === "object" ? data.meta : null;
+    const hasCanonicalLeftInput = Boolean(canonicalMeta?.__hasCanonicalLeftInput);
+    const hasCanonicalRightInput = Boolean(canonicalMeta?.__hasCanonicalRightInput);
+    const isSingleSidedCanonical = Boolean(canonicalMeta?.__isSingleSidedCanonical);
+    const hasCompanyOutput = Boolean(canonicalMeta?.__hasCompanyOutput);
 
     return (
         <div
             style={{
                 width: NODE_WIDTH,
-                minHeight: nodeHeight,
+                minHeight: isAnchorNodeType(data.type) ? undefined : nodeHeight,
                 padding: data.type === "canonical_skill" ? "0.6rem 0.8rem" : "0.8rem",
                 borderRadius: "14px",
                 background: bg,
                 color: "#f3f4f6",
                 border: "1px solid rgba(255,255,255,0.14)",
                 boxShadow: "0 10px 24px rgba(0,0,0,0.28)",
+                opacity: isSingleSidedCanonical ? 0.5 : 1,
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
                 position: "relative",
             }}
         >
-            {data.type !== "person" && data.type !== "job" && (
-                <Handle
-                    type="target"
-                    position={Position.Left}
-                    id="target-left"
-                    style={HANDLE_STYLES}
-                />
-            )}
+            {data.type !== "person" &&
+                data.type !== "job" &&
+                data.type !== "canonical_skill" &&
+                data.type !== "company" && (
+                    <Handle
+                        type="target"
+                        position={Position.Left}
+                        id="target-left"
+                        style={HANDLE_STYLES}
+                    />
+                )}
 
-            {data.type !== "canonical_skill" && data.type !== "job" && (
+            {data.type !== "canonical_skill" &&
+                data.type !== "job" &&
+                data.type !== "company" && (
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="source-right"
+                        style={HANDLE_STYLES}
+                    />
+                )}
+
+            {data.type === "company" && hasCompanyOutput && (
                 <Handle
                     type="source"
                     position={Position.Right}
@@ -174,12 +248,24 @@ function KGNodeComponent({ data }: NodeProps<Node<RFNodeData>>) {
             )}
 
             {data.type === "canonical_skill" && (
-                <Handle
-                    type="target"
-                    position={Position.Right}
-                    id="target-right"
-                    style={HANDLE_STYLES}
-                />
+                <>
+                    {hasCanonicalLeftInput && (
+                        <Handle
+                            type="target"
+                            position={Position.Left}
+                            id="target-left"
+                            style={HANDLE_STYLES}
+                        />
+                    )}
+                    {hasCanonicalRightInput && (
+                        <Handle
+                            type="target"
+                            position={Position.Right}
+                            id="target-right"
+                            style={HANDLE_STYLES}
+                        />
+                    )}
+                </>
             )}
 
             <div
@@ -223,12 +309,16 @@ const nodeTypes = {
 
 function buildVisibleGraph(graph: KnowledgeGraph) {
     const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+    const isHiddenBridgeNode = (node: KGNode) =>
+        node.type === "keyword" ||
+        (node.type === "person_skill" && String(node.meta?.kind ?? "") !== "skill_group");
 
     // Keep the main hubs visible.
-    // Keywords are collapsed away.
+    // Keywords and individual person skills are collapsed away.
+    // Person skill groups stay visible and connect through hidden skills.
     // Canonical skills stay visible, but they must never act as parents.
-    const visibleNodes = graph.nodes.filter((n) => n.type !== "keyword");
-    const visibleIds = new Set(visibleNodes.map((n) => n.id));
+    const visibleNodesBase = graph.nodes.filter((n) => !isHiddenBridgeNode(n));
+    const visibleIds = new Set(visibleNodesBase.map((n) => n.id));
 
     const edgeMap = new Map<string, Edge>();
 
@@ -239,6 +329,11 @@ function buildVisibleGraph(graph: KnowledgeGraph) {
 
         // Canonical skills are shared vocabulary only; they should not have children.
         if (sourceNode.type === "canonical_skill" && targetNode.type !== "canonical_skill") {
+            return;
+        }
+
+        // Companies sit visually under their parent; hide the incoming parent link.
+        if (targetNode.type === "company") {
             return;
         }
 
@@ -285,8 +380,8 @@ function buildVisibleGraph(graph: KnowledgeGraph) {
         }
     }
 
-    // Collapse hidden keyword nodes by rewiring visible parent -> visible child.
-    for (const hidden of graph.nodes.filter((n) => n.type === "keyword")) {
+    // Collapse hidden bridge nodes by rewiring visible parent -> visible child.
+    for (const hidden of graph.nodes.filter(isHiddenBridgeNode)) {
         const incoming = graph.edges.filter(
             (e) => e.target === hidden.id && visibleIds.has(e.source)
         );
@@ -317,14 +412,107 @@ function buildVisibleGraph(graph: KnowledgeGraph) {
         }
     }
 
+    const canonicalInputSides = new Map<
+        string,
+        { hasCanonicalLeftInput: boolean; hasCanonicalRightInput: boolean }
+    >();
+    const companyOutput = new Map<string, boolean>();
+
+    for (const edge of edgeMap.values()) {
+        const sourceNode = nodeById.get(edge.source);
+        const targetNode = nodeById.get(edge.target);
+
+        if (!sourceNode || !targetNode) continue;
+
+        if (targetNode.type === "canonical_skill") {
+            const current =
+                canonicalInputSides.get(targetNode.id) ?? {
+                    hasCanonicalLeftInput: false,
+                    hasCanonicalRightInput: false,
+                };
+
+            if (sourceNode.type === "job") {
+                current.hasCanonicalRightInput = true;
+            } else {
+                current.hasCanonicalLeftInput = true;
+            }
+
+            canonicalInputSides.set(targetNode.id, current);
+        }
+
+        if (sourceNode.type === "company") {
+            companyOutput.set(sourceNode.id, true);
+        }
+    }
+
+    const visibleNodes = visibleNodesBase.map((node) => {
+        if (node.type === "canonical_skill") {
+            const sideState = canonicalInputSides.get(node.id) ?? {
+                hasCanonicalLeftInput: false,
+                hasCanonicalRightInput: false,
+            };
+
+            return {
+                ...node,
+                meta: {
+                    ...(node.meta ?? {}),
+                    __hasCanonicalLeftInput: sideState.hasCanonicalLeftInput,
+                    __hasCanonicalRightInput: sideState.hasCanonicalRightInput,
+                    __isSingleSidedCanonical:
+                        sideState.hasCanonicalLeftInput !== sideState.hasCanonicalRightInput,
+                },
+            };
+        }
+
+        if (node.type === "company") {
+            return {
+                ...node,
+                meta: {
+                    ...(node.meta ?? {}),
+                    __hasCompanyOutput: companyOutput.get(node.id) ?? false,
+                },
+            };
+        }
+
+        return node;
+    });
+
+    const visibleEdges = [...edgeMap.values()].map((edge) => {
+        const targetNode = nodeById.get(edge.target);
+        const sideState = canonicalInputSides.get(edge.target);
+        const isSingleSidedCanonicalEdge =
+            targetNode?.type === "canonical_skill" &&
+            sideState !== undefined &&
+            sideState.hasCanonicalLeftInput !== sideState.hasCanonicalRightInput;
+
+        if (!isSingleSidedCanonicalEdge) return edge;
+
+        return {
+            ...edge,
+            style: {
+                ...edge.style,
+                opacity: 0.5,
+            },
+            labelStyle: {
+                ...edge.labelStyle,
+                opacity: 0.5,
+            },
+            labelBgStyle: {
+                ...edge.labelBgStyle,
+                fillOpacity: 0.5,
+            },
+        };
+    });
+
     return {
         nodes: visibleNodes,
-        edges: [...edgeMap.values()],
+        edges: visibleEdges,
     };
 }
 
 function autoLayout(graph: KnowledgeGraph) {
     const visibleGraph = buildVisibleGraph(graph);
+    const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
 
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -339,7 +527,7 @@ function autoLayout(graph: KnowledgeGraph) {
     visibleGraph.nodes.forEach((n) => {
         dagreGraph.setNode(n.id, {
             width: NODE_WIDTH,
-            height: getNodeHeight(n.type),
+            height: getLayoutNodeHeight(n),
         });
     });
 
@@ -351,7 +539,7 @@ function autoLayout(graph: KnowledgeGraph) {
 
     const rawNodes: Node<RFNodeData>[] = visibleGraph.nodes.map((n) => {
         const pos = dagreGraph.node(n.id);
-        const height = getNodeHeight(n.type);
+        const height = getLayoutNodeHeight(n);
 
         return {
             id: n.id,
@@ -371,15 +559,33 @@ function autoLayout(graph: KnowledgeGraph) {
         return { nodes: rawNodes, edges: visibleGraph.edges };
     }
 
-    const personHeight = getNodeHeight(personNode.data.type);
-    const jobHeight = getNodeHeight(jobNode.data.type);
+    const companyParentById = new Map<string, string>();
+    const companyIdsByParentId = new Map<string, string[]>();
+    const visibleIds = new Set(visibleGraph.nodes.map((n) => n.id));
+
+    for (const edge of graph.edges) {
+        const targetNode = nodeById.get(edge.target);
+        if (
+            targetNode?.type === "company" &&
+            visibleIds.has(edge.source) &&
+            visibleIds.has(edge.target)
+        ) {
+            companyParentById.set(edge.target, edge.source);
+            const companyIds = companyIdsByParentId.get(edge.source) ?? [];
+            companyIds.push(edge.target);
+            companyIdsByParentId.set(edge.source, companyIds);
+        }
+    }
+
+    const personHeight = getLayoutNodeHeight(personNode.data);
+    const jobHeight = getLayoutNodeHeight(jobNode.data);
 
     const anchorCenterY =
         Math.round(
             (personNode.position.y + personHeight / 2 + jobNode.position.y + jobHeight / 2) / 2
         ) || 0;
 
-    const anchorY = anchorCenterY - NODE_HEIGHT / 2;
+    const anchorY = anchorCenterY - getNodeHeight("person") / 2;
 
     const nonAnchors = rawNodes.filter(
         (n) => n.id !== personNode.id && n.id !== jobNode.id && n.data.type !== "canonical_skill"
@@ -389,10 +595,10 @@ function autoLayout(graph: KnowledgeGraph) {
     const nonAnchorMaxX = nonAnchors.length ? Math.max(...nonAnchors.map((n) => n.position.x)) : 1;
     const nonAnchorSpan = Math.max(nonAnchorMaxX - nonAnchorMinX, 1);
 
-    const graphWidth = Math.max(NODE_WIDTH * 4, nonAnchorSpan + NODE_WIDTH * 2);
+    let graphWidth = Math.max(NODE_WIDTH * 4, nonAnchorSpan + NODE_WIDTH * 2);
     const leftX = 0;
-    const rightX = graphWidth;
-    const centerX = Math.round(rightX / 2);
+    let rightX = graphWidth;
+    let centerX = Math.round(rightX / 2);
 
     const leftBandStart = NODE_WIDTH * 0.7;
     const leftBandEnd = Math.max(leftBandStart + 1, centerX - NODE_WIDTH - 30);
@@ -420,7 +626,7 @@ function autoLayout(graph: KnowledgeGraph) {
         .filter((n) => n.data.type === "canonical_skill")
         .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
 
-    const canonicalHeights = canonicalSkills.map((n) => getNodeHeight(n.data.type));
+    const canonicalHeights = canonicalSkills.map((n) => getLayoutNodeHeight(n.data));
     const totalCanonicalHeight =
         canonicalSkills.length > 0
             ? canonicalHeights.reduce((sum, h) => sum + h, 0) +
@@ -429,7 +635,78 @@ function autoLayout(graph: KnowledgeGraph) {
 
     const canonicalStartY = Math.round(anchorCenterY - totalCanonicalHeight / 2);
 
-    const nodes = rawNodes.map((node) => {
+    const typeXMap = new Map<KGNodeType, number>();
+
+    for (const type of new Set(rawNodes.map((n) => n.data.type))) {
+        if (type === "person" || type === "company") continue;
+
+        const typeNodes = rawNodes.filter((n) => n.data.type === type);
+        if (typeNodes.length > 0) {
+            typeXMap.set(type, median(typeNodes.map((n) => n.position.x)));
+        }
+    }
+
+    const maxAlignedNonCanonicalX = Math.max(
+        centerX,
+        ...Array.from(typeXMap.entries())
+            .filter(([type]) => type !== "canonical_skill")
+            .map(([, x]) => x)
+    );
+
+    const canonicalX = maxAlignedNonCanonicalX + NODE_WIDTH + 80;
+    graphWidth = Math.max(graphWidth, canonicalX + NODE_WIDTH + 80);
+    rightX = graphWidth;
+    centerX = Math.round(rightX / 2);
+
+    const alignedNodes = rawNodes.filter(
+        (n) =>
+            n.id !== personNode.id &&
+            n.id !== jobNode.id &&
+            n.data.type !== "canonical_skill" &&
+            n.data.type !== "company"
+    );
+
+    const nodesByType = new Map<KGNodeType, Node<RFNodeData>[]>();
+    for (const node of alignedNodes) {
+        const arr = nodesByType.get(node.data.type) ?? [];
+        arr.push(node);
+        nodesByType.set(node.data.type, arr);
+    }
+
+    const orderedTypes = [...nodesByType.entries()]
+        .sort(
+            (a, b) =>
+                median(a[1].map((n) => n.position.y)) - median(b[1].map((n) => n.position.y))
+        )
+        .map(([type]) => type);
+
+    const alignedYMap = new Map<string, number>();
+    const startY = Math.min(...alignedNodes.map((n) => n.position.y));
+
+    let cursorY = startY;
+    for (const type of orderedTypes) {
+        const group = (nodesByType.get(type) ?? []).sort(
+            (a, b) => a.position.y - b.position.y || a.position.x - b.position.x
+        );
+
+        for (const node of group) {
+            const nodeHeight = getLayoutNodeHeight(node.data);
+            const companyHeight = (companyIdsByParentId.get(node.id) ?? []).reduce(
+                (sum, companyId) => {
+                    const companyNode = nodeById.get(companyId);
+                    return companyNode ? sum + getLayoutNodeHeight(companyNode) : sum;
+                },
+                0
+            );
+
+            alignedYMap.set(node.id, cursorY);
+            cursorY += nodeHeight + companyHeight + TYPE_NODE_GAP;
+        }
+
+        cursorY += TYPE_BLOCK_GAP;
+    }
+
+    const positionedNodes = rawNodes.map((node) => {
         if (node.id === personNode.id) {
             return {
                 ...node,
@@ -444,7 +721,7 @@ function autoLayout(graph: KnowledgeGraph) {
             return {
                 ...node,
                 position: {
-                    x: rightX,
+                    x: rightX + 100,
                     y: anchorY,
                 },
             };
@@ -452,7 +729,7 @@ function autoLayout(graph: KnowledgeGraph) {
 
         if (node.data.type === "canonical_skill") {
             const idx = canonicalSkills.findIndex((n) => n.id === node.id);
-            const height = getNodeHeight(node.data.type);
+            const height = getLayoutNodeHeight(node.data);
             const yOffset =
                 canonicalHeights.slice(0, idx).reduce((sum, h) => sum + h, 0) +
                 idx * CANONICAL_GAP;
@@ -460,7 +737,7 @@ function autoLayout(graph: KnowledgeGraph) {
             return {
                 ...node,
                 position: {
-                    x: centerX,
+                    x: canonicalX,
                     y: canonicalStartY + yOffset,
                 },
                 style: {
@@ -470,32 +747,48 @@ function autoLayout(graph: KnowledgeGraph) {
             };
         }
 
-        const raw = node.position.x;
-        const side =
-            leftNodes.some((n) => n.id === node.id) || raw <= midRawX ? "left" : "right";
+        const alignedX = typeXMap.get(node.data.type);
 
-        const x =
-            side === "left"
-                ? scaleToBand(
-                    raw,
-                    Math.min(...leftNodes.map((n) => n.position.x), nonAnchorMinX),
-                    Math.max(...leftNodes.map((n) => n.position.x), nonAnchorMinX),
-                    leftBandStart,
-                    leftBandEnd
-                )
-                : scaleToBand(
-                    raw,
-                    Math.min(...rightNodes.map((n) => n.position.x), nonAnchorMinX),
-                    Math.max(...rightNodes.map((n) => n.position.x), nonAnchorMaxX),
-                    rightBandStart,
-                    rightBandEnd
-                );
+        if (alignedX !== undefined && node.data.type !== "company" && node.data.type !== "person") {
+            const alignedY = alignedYMap.get(node.id);
+            return {
+                ...node,
+                position: {
+                    x: alignedX,
+                    y: alignedY ?? node.position.y,
+                },
+            };
+        }
+
+        return node;
+    });
+
+    const positionedNodeById = new Map(positionedNodes.map((node) => [node.id, node]));
+    const nodes = positionedNodes.map((node) => {
+        if (node.data.type !== "company") return node;
+
+        const parentId = companyParentById.get(node.id);
+        const parent = parentId ? positionedNodeById.get(parentId) : undefined;
+        if (!parent) return node;
+
+        const siblingCompanyIds = parentId ? companyIdsByParentId.get(parentId) ?? [] : [];
+        const companyYOffset = siblingCompanyIds
+            .slice(0, siblingCompanyIds.indexOf(node.id))
+            .reduce((sum, companyId) => {
+                const companyNode = nodeById.get(companyId);
+                return companyNode ? sum + getLayoutNodeHeight(companyNode) : sum;
+            }, 0);
 
         return {
             ...node,
             position: {
-                x,
-                y: node.position.y,
+                x: parent.position.x,
+                y:
+                    parent.position.y +
+                    (parent.data.type === "job"
+                        ? ANCHOR_NODE_RENDERED_HEIGHT
+                        : getLayoutNodeHeight(parent.data)) +
+                    companyYOffset,
             },
         };
     });
@@ -505,16 +798,63 @@ function autoLayout(graph: KnowledgeGraph) {
 
 export default function KnowledgeGraphView({ graph }: { graph: KnowledgeGraph }) {
     const { nodes, edges } = useMemo(() => autoLayout(graph), [graph]);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const reactFlowRef = useRef<ReactFlowInstance<Node<RFNodeData>, Edge> | null>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const updateFullscreenState = () => {
+            setIsFullscreen(document.fullscreenElement === containerRef.current);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    reactFlowRef.current?.fitView({ duration: 250, padding: 0.12 });
+                });
+            });
+        };
+
+        document.addEventListener("fullscreenchange", updateFullscreenState);
+
+        return () => {
+            document.removeEventListener("fullscreenchange", updateFullscreenState);
+        };
+    }, []);
+
+    const handleToggleFullscreen = async () => {
+        if (document.fullscreenElement === containerRef.current) {
+            await document.exitFullscreen();
+            return;
+        }
+
+        await containerRef.current?.requestFullscreen();
+    };
 
     return (
-        <div className="kg-container">
+        <div className="kg-container" ref={containerRef}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 fitView
+                onInit={(instance) => {
+                    reactFlowRef.current = instance;
+                }}
                 proOptions={{ hideAttribution: true }}
             >
+                {!isFullscreen && (
+                    <Panel position="top-right">
+                        <button
+                            className="kg-fullscreen-button"
+                            type="button"
+                            onClick={handleToggleFullscreen}
+                        >
+                            <img
+                                src={"/icons/full-screen.svg"}
+                                alt="full-screen icon"
+                                style={{ width: "30px", height: "30px" }}
+                            />
+                        </button>
+                    </Panel>
+                )}
                 {/* <Background gap={18} size={1} color="#232323" /> */}
                 {/* <Controls /> */}
             </ReactFlow>
