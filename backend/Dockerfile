@@ -5,11 +5,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple/ -r requirements.txt
 
-# RUN apt-get update && \
-#     apt-get install -y --no-install-recommends \
-#         texlive-xetex \
-#         lmodern && \
-#     rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        texlive-xetex \
+        texlive-fonts-recommended \
+        texlive-fonts-extra \
+        fonts-font-awesome \
+        lmodern && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY main.py .
 

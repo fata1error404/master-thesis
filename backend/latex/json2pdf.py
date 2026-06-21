@@ -14,6 +14,18 @@ BACKEND_DIR = MODULE_DIR.parent
 DEFAULT_TEMPLATE_DIR = MODULE_DIR
 DEFAULT_TEMPLATE_NAME = "resume.tex.jinja"
 DEFAULT_OUTPUT_DIR = BACKEND_DIR / "outputs"
+LATEX_ARTIFACT_SUFFIXES = (
+    ".aux",
+    ".fdb_latexmk",
+    ".fls",
+    ".log",
+    ".out",
+    ".pdf",
+    ".synctex.gz",
+    ".tex",
+    ".xdv",
+)
+LATEX_EXTRA_ARTIFACTS = ("missfont.log",)
 
 
 LATEX_ESCAPE_MAP = {
@@ -152,13 +164,16 @@ def compile_pdf(
     print(f"[compile_pdf] command={' '.join(command)}", flush=True)
 
     try:
-        result = subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        result = None
+        for _ in range(2):
+            result = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
+        assert result is not None
         print(f"[compile_pdf] returncode={result.returncode}", flush=True)
 
         if result.stdout:
@@ -207,6 +222,20 @@ def compile_pdf(
     return pdf_path
 
 
+def cleanup_latex_artifacts(
+    pdf_path: str | Path,
+    output_dir: str | Path | None = None,
+) -> None:
+    pdf_path = Path(pdf_path)
+    output_dir = Path(output_dir) if output_dir is not None else pdf_path.parent
+
+    for suffix in LATEX_ARTIFACT_SUFFIXES:
+        (output_dir / f"{pdf_path.stem}{suffix}").unlink(missing_ok=True)
+
+    for file_name in LATEX_EXTRA_ARTIFACTS:
+        (output_dir / file_name).unlink(missing_ok=True)
+
+
 def json_to_pdf(
     json_path: str | Path,
     template_dir: str | Path = DEFAULT_TEMPLATE_DIR,
@@ -231,5 +260,5 @@ def json_to_pdf(
         zipf.write(rendered_tex_path, arcname="resume.tex")
         zipf.write(cls_path, arcname="resume.cls")
 
-    return rendered_tex_path
-    # return compile_pdf(tex_path=rendered_tex_path, output_dir=output_dir)
+    # return rendered_tex_path
+    return compile_pdf(tex_path=rendered_tex_path, output_dir=output_dir)

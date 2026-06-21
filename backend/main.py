@@ -27,7 +27,7 @@ from llm.metric_job_alignment import compute_job_alignment
 from llm.metric_content_preservation import compute_content_preservation
 from llm.metric_structural_validity import compute_structural_validity
 from llm.metric_resume_flow import compute_resume_flow_metrics
-from latex.json2pdf import json_to_pdf
+from latex.json2pdf import cleanup_latex_artifacts, json_to_pdf
 
 @dataclass
 class PipelineState:
@@ -262,14 +262,15 @@ async def tailor(request: TailorRequest):
 
             original_pdf_base64 = base64.b64encode(original_pdf_bytes).decode("utf-8")
 
-            # new_pdf_path = await asyncio.to_thread(
-            #     json_to_pdf,
-            #     "/app/outputs/resume_tailored.json"
-            # )
+            new_pdf_path = await asyncio.to_thread(
+                json_to_pdf,
+                "/app/outputs/resume_tailored.json"
+            )
 
             new_pdf_bytes = await asyncio.to_thread(
-                Path("outputs/resume_tailored.pdf").read_bytes
+                new_pdf_path.read_bytes
             )
+            await asyncio.to_thread(cleanup_latex_artifacts, new_pdf_path)
 
             new_pdf_base64 = base64.b64encode(new_pdf_bytes).decode("utf-8")
 

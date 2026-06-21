@@ -23,8 +23,8 @@
 \address{
 \BLOCK{ if phone }{\faPhone} \href{tel:\VAR{phone}}{\VAR{phone.replace(' ','')}} \quad \BLOCK{ endif }
 \BLOCK{ if email }{\faEnvelope} \href{mailto:\VAR{email}}{\VAR{email}} \quad \BLOCK{ endif }
-\BLOCK{ if media.github }{\faGithub} \href{\VAR{media.github}}{\VAR{media.github}} \quad \BLOCK{ endif }
-\BLOCK{ if media.linkedin }{\faLinkedin} \href{\VAR{media.linkedin}}{\VAR{media.linkedin}} \BLOCK{ endif }
+\BLOCK{ if media.github }{\faGithub} \href{\VAR{media.github}}{\nolinkurl{\VAR{media.github}}} \quad \BLOCK{ endif }
+\BLOCK{ if media.linkedin }{\faLinkedin} \href{\VAR{media.linkedin}}{\nolinkurl{\VAR{media.linkedin}}} \BLOCK{ endif }
 }
 
 \begin{document}

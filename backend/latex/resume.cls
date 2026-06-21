@@ -37,7 +37,7 @@
 \def \printaddress #1{
   \begingroup
     \def \\ {\addressSep\ }
-    \centerline{#1}
+    \centering #1\par
   \endgroup
   \par
   \addressskip
