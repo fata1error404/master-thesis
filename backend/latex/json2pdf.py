@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import zipfile
 import subprocess
 from pathlib import Path
@@ -253,12 +254,19 @@ def json_to_pdf(
     )
 
     cls_path = Path(template_dir) / "resume.cls"
+    staged_cls_path = output_dir / "resume.cls"
+
+    if not cls_path.exists():
+        raise FileNotFoundError(f"LaTeX class file not found: {cls_path}")
+
+    if cls_path.resolve() != staged_cls_path.resolve():
+        shutil.copy2(cls_path, staged_cls_path)
 
     zip_path = output_dir / "overleaf.zip"
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         zipf.write(rendered_tex_path, arcname="resume.tex")
-        zipf.write(cls_path, arcname="resume.cls")
+        zipf.write(staged_cls_path, arcname="resume.cls")
 
     # return rendered_tex_path
     return compile_pdf(tex_path=rendered_tex_path, output_dir=output_dir)

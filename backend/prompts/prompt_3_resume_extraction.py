@@ -19,6 +19,12 @@ RESUME_DETAILS_EXTRACTOR = """
     2. Extract Information:
     - Systematically parse each section, extracting relevant details.
     - Pay attention to dates, titles, organizations, and descriptions.
+    - In education, preserve department/faculty/program names, GPA/grade, honors, thesis titles, scholarships, selective programs, and university ranking/prestige facts exactly when present.
+    - Put department/faculty/program names in the education "department" field; do not convert them into a generic degree.
+    - Put GPA or grade in the education "grade" field, and put ranking/prestige/honors/thesis facts in education "highlights".
+    - Extract project descriptions from any bullets, short paragraphs, or indented lines that appear under a project name.
+    - Do not leave project descriptions empty if the resume text contains evidence below or near that project title.
+    - Preserve project names, links, and descriptions exactly enough that they remain factually grounded.
 
     3. Handle Variations:
     - Account for different resume styles, formats, and section orders.
@@ -27,9 +33,17 @@ RESUME_DETAILS_EXTRACTOR = """
     5. Optimize Output:
     - Handle missing or incomplete information appropriately (use null values or empty arrays/objects as needed).
     - Standardize date formats, if applicable.
+    - Never use "Unknown", "N/A", "Not specified", or similar placeholder strings.
+    - For missing dates or locations, use an empty string.
+    - For work experience location, extract a value only when the resume explicitly states a location for that specific work entry.
+    - Do not infer work locations from education, contact information, current university, candidate address, or surrounding document context.
+    - If multiple unrelated work entries would receive the same inferred location, leave their location fields empty instead.
 
     6. Validate:
     - Review the extracted data for consistency and completeness.
     - Ensure all required fields are populated if the information is available in the resume.
+    - Check that GPA/grade and strong education facts did not disappear when present in the resume text.
+    - Check that no work experience location was guessed.
+    - Check that no project with visible bullet text lost its description.
 </instructions>
 """

@@ -2,6 +2,7 @@ import time
 import json
 import asyncio
 import base64
+import re
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -19,7 +20,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from llm.context_builder import introduce_context
 from llm.job_details_extractor import extract_job_details
-from llm.resume_extractor import extract_resume
+from llm.resume_extractor import extract_resume, postprocess_extracted_resume
 from llm.rag_retriever import retrieve_rag_context
 from llm.knowledge_graph_builder import build_knowledge_graph
 from llm.resume_builder import build_resume
@@ -85,6 +86,25 @@ def open_file(file_name: str):
         return json.load(f)
 
 
+def read_pdf_text(file_name: str) -> str:
+    try:
+        import fitz
+    except Exception:
+        return ""
+
+    pdf_path = Path(file_name)
+    if not pdf_path.exists():
+        return ""
+
+    doc = fitz.open(pdf_path)
+    pages_text = [page.get_text() for page in doc]
+    resume_text = "\n\n".join(pages_text).strip()
+    resume_text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", resume_text)
+    resume_text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]+", " ", resume_text)
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in resume_text.split("\n")]
+    return "\n".join(lines)
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello from backend — API docs at /docs"}
@@ -139,15 +159,10 @@ async def tailor(request: TailorRequest):
 
         try:
             state.resume_original_data = await asyncio.to_thread(
-                open_file,
-                "outputs/resume.json"
+                extract_resume,
+                request.resume_file_id,
+                OUTPUT_DIR
             )
-
-            # state.resume_original_data = await asyncio.to_thread(
-            #     extract_resume,
-            #     request.resume_file_id,
-            #     OUTPUT_DIR
-            # )
 
             yield json.dumps({
                 "type": "resume_original_data",
@@ -157,11 +172,38 @@ async def tailor(request: TailorRequest):
             await asyncio.sleep(0)
 
         except Exception as e:
-            yield json.dumps({
-                "type": "error",
-                "step": "resume_details_extraction",
-                "message": str(e)
-            }) + "\n"
+            try:
+                state.resume_original_data = await asyncio.to_thread(
+                    open_file,
+                    "outputs/resume.json"
+                )
+                resume_text = await asyncio.to_thread(
+                    read_pdf_text,
+                    f"outputs/{request.resume_file_id}.pdf",
+                )
+                state.resume_original_data = postprocess_extracted_resume(
+                    state.resume_original_data,
+                    resume_text,
+                )
+
+                yield json.dumps({
+                    "type": "resume_original_data",
+                    "data": state.resume_original_data,
+                    "meta": {
+                        "source": "cached_fallback",
+                        "fallback_reason": str(e),
+                    },
+                }) + "\n"
+
+                await asyncio.sleep(0)
+
+            except Exception as fallback_error:
+                yield json.dumps({
+                    "type": "error",
+                    "step": "resume_details_extraction",
+                    "message": str(e),
+                    "fallback_message": str(fallback_error),
+                }) + "\n"
 
         try:
             if request.enable_rag:
@@ -229,17 +271,14 @@ async def tailor(request: TailorRequest):
 
         try:
             state.resume_tailored_data = await asyncio.to_thread(
-                open_file,
-                "outputs/resume_tailored.json"
+                build_resume,
+                state.job_details,
+                state.resume_original_data,
+                request.resume_file_id,
+                OUTPUT_DIR,
+                state.rag_context if request.enable_rag else None,
+                state.knowledge_graph if request.enable_knowledge_graph else None,
             )
-
-            # state.resume_tailored_data = await asyncio.to_thread(
-            #     build_resume,
-            #     state.job_details,
-            #     state.resume_original_data,
-            #     request.resume_file_id,
-            #     OUTPUT_DIR
-            # )
 
             yield json.dumps({
                 "type": "resume_tailored_data",
@@ -249,11 +288,30 @@ async def tailor(request: TailorRequest):
             await asyncio.sleep(0)
 
         except Exception as e:
-            yield json.dumps({
-                "type": "error",
-                "step": "resume_tailoring",
-                "message": str(e)
-            }) + "\n"
+            try:
+                state.resume_tailored_data = await asyncio.to_thread(
+                    open_file,
+                    "outputs/resume_tailored.json"
+                )
+
+                yield json.dumps({
+                    "type": "resume_tailored_data",
+                    "data": state.resume_tailored_data,
+                    "meta": {
+                        "source": "cached_fallback",
+                        "fallback_reason": str(e),
+                    },
+                }) + "\n"
+
+                await asyncio.sleep(0)
+
+            except Exception as fallback_error:
+                yield json.dumps({
+                    "type": "error",
+                    "step": "resume_tailoring",
+                    "message": str(e),
+                    "fallback_message": str(fallback_error),
+                }) + "\n"
 
         try:
             original_pdf_bytes = await asyncio.to_thread(

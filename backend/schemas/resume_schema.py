@@ -20,11 +20,14 @@ class Experience(BaseModel):
     description: List[str] = Field(description="A list of 3 bullet points describing the work experience, tailored to match job requirements. Each bullet point should follow the 'Did X by doing Y, achieved Z' format, quantify impact, implicitly use STAR methodology, use strong action verbs, and be highly relevant to the specific job. Ensure clarity, active voice, and impeccable grammar.")
 
 class Education(BaseModel):
-    degree: str = Field(description="The degree or qualification obtained and The major or field of study. e.g., Bachelor of Science in Computer Science.")
+    degree: str = Field(description="The degree or qualification obtained exactly as stated. Do not replace a department name with a generic degree.")
     university: str = Field(description="The name of the institution where the degree was obtained with location. e.g. Arizona State University, Tempe, USA")
+    department: Optional[str] = Field(default=None, description="Department, faculty, school, or program name exactly as stated, e.g., Department of Computer Science and Technology.")
     from_date: str = Field(description="The start date of the education period. e.g. Aug 2023")
     to_date: str = Field(description="The end date of the education period. e.g. May 2025")
+    grade: Optional[str] = Field(default=None, description="GPA, grade, honors, or academic score exactly as stated in the resume, e.g., 3.8/4.0.")
     courses: List[str] = Field(description="Relevant courses or subjects studied during the education period. e.g. [Data Structures, Algorithms, Machine Learning]")
+    highlights: Optional[List[str]] = Field(default=None, description="Strong education facts such as top university ranking, scholarship, honors, thesis, or selective program information.")
 
 class SkillSection(BaseModel):
     name: str = Field(description="name or title of the skill group and competencies relevant to the job, such as programming languages, data science, tools & technologies, cloud & DevOps, full stack,  or soft skills.")

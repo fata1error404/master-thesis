@@ -33,19 +33,24 @@
 \BLOCK{ if work_experience_section }
     \begin{rSection}{Work Experience}
         \BLOCK{ for exp in work_experience_section }
+            \BLOCK{ if exp.description }
             \begin{rSubsection}
                 {\VAR{exp.role}}
-                {\BLOCK{ if exp.from_date }\VAR{exp.from_date} - \BLOCK{ endif }\BLOCK{ if exp.to_date }\VAR{exp.to_date}\BLOCK{ endif }}
+                {\BLOCK{ if exp.from_date and exp.to_date }\VAR{exp.from_date} - \VAR{exp.to_date}\BLOCK{ elif exp.from_date }\VAR{exp.from_date}\BLOCK{ elif exp.to_date }\VAR{exp.to_date}\BLOCK{ endif }}
                 \BLOCK{ if exp.link is defined and exp.link }
                     {\normalfont{\textit{\href{\VAR{exp.link}}{\VAR{exp.company}}}}}
                 \BLOCK{ else }
                     {\normalfont{\textit{\VAR{exp.company}}}}
                 \BLOCK{ endif }
-                {\normalfont{\textit{\VAR{exp.location}}}}
+                {\normalfont{\textit{\BLOCK{ if exp.location }\VAR{exp.location}\BLOCK{ endif }}}}
                 \BLOCK{ for point in exp.description }
                     \item \VAR{point}
                 \BLOCK{ endfor }
             \end{rSubsection}
+            \BLOCK{ else }
+                \textbf{\VAR{exp.role}} \hfill {\BLOCK{ if exp.from_date and exp.to_date }\VAR{exp.from_date} - \VAR{exp.to_date}\BLOCK{ elif exp.from_date }\VAR{exp.from_date}\BLOCK{ elif exp.to_date }\VAR{exp.to_date}\BLOCK{ endif }}\\
+                \textit{\VAR{exp.company}}\BLOCK{ if exp.location } \hfill \textit{\VAR{exp.location}}\BLOCK{ endif }\par\smallskip
+            \BLOCK{ endif }
         \BLOCK{ endfor }
     \end{rSection}
 \BLOCK{ endif }
@@ -55,16 +60,28 @@
 \begin{rSection}{Education}
     \BLOCK{ for school in education_section }
         \BLOCK{ if school.university }
-            \textbf{\VAR{school.university}} \hfill {\VAR{school.from_date} - \VAR{school.to_date}} \\
+            \textbf{\VAR{school.university}} \hfill {\BLOCK{ if school.from_date and school.to_date }\VAR{school.from_date} - \VAR{school.to_date}\BLOCK{ elif school.from_date }\VAR{school.from_date}\BLOCK{ elif school.to_date }\VAR{school.to_date}\BLOCK{ endif }} \\
+            \BLOCK{ if school.department is defined and school.department }
+                {\VAR{school.department}} \\
+            \BLOCK{ endif }
             \BLOCK{ if school.degree }
                 {\VAR{school.degree}}
+                \BLOCK{ if school.grade is defined and school.grade }
+                    \hfill {(GPA: \VAR{school.grade})}
+                \BLOCK{ endif }
+                \\
+            \BLOCK{ elif school.grade is defined and school.grade }
+                {(GPA: \VAR{school.grade})} \\
             \BLOCK{ endif }
-            \BLOCK{ if school.grade is defined and school.grade }
-                \hfill {(GPA: \VAR{school.grade})}
+            \BLOCK{ if school.highlights is defined and school.highlights }
+                \BLOCK{ for highlight in school.highlights }
+                    \hspace{1em}{\tiny$\bullet$}\hspace{0.35em}\VAR{highlight} \\
+                \BLOCK{ endfor }
             \BLOCK{ endif }
             \BLOCK{ if school.courses is defined and school.courses }
-                \textbf{\textit{Relevant Courses:}} \textit{\VAR{school.courses | join(', ')}}
+                \textbf{\textit{Relevant Courses:}} \textit{\VAR{school.courses | join(', ')}} \\
             \BLOCK{ endif }
+            \vspace{0.25em}
         \BLOCK{ endif }
     \BLOCK{ endfor }
 \end{rSection}
@@ -74,17 +91,29 @@
 \BLOCK{ if projects_section }
     \begin{rSection}{Projects}
         \BLOCK{ for project in projects_section }
+            \BLOCK{ if project.description }
             \begin{rSubsection}
                 \BLOCK{ if project.link }
                     {\href{\VAR{project.link}}{\VAR{project.name}}}
                 \BLOCK{ else }
                     {\VAR{project.name}}
                 \BLOCK{ endif }
-                {\normalfont{\VAR{project.from_date} - \VAR{project.to_date}}}{}{}
+                {\normalfont{\BLOCK{ if project.from_date and project.to_date }\VAR{project.from_date} - \VAR{project.to_date}\BLOCK{ elif project.from_date }\VAR{project.from_date}\BLOCK{ elif project.to_date }\VAR{project.to_date}\BLOCK{ endif }}}{}{}
                 \BLOCK{ for point in project.description }
                     \item \VAR{point}
                 \BLOCK{ endfor }
             \end{rSubsection}
+            \BLOCK{ else }
+                \BLOCK{ if project.link }
+                    \textbf{\href{\VAR{project.link}}{\VAR{project.name}}}
+                \BLOCK{ else }
+                    \textbf{\VAR{project.name}}
+                \BLOCK{ endif }
+                \BLOCK{ if project.from_date or project.to_date }
+                    \hfill {\normalfont{\BLOCK{ if project.from_date and project.to_date }\VAR{project.from_date} - \VAR{project.to_date}\BLOCK{ elif project.from_date }\VAR{project.from_date}\BLOCK{ elif project.to_date }\VAR{project.to_date}\BLOCK{ endif }}}
+                \BLOCK{ endif }
+                \par\smallskip
+            \BLOCK{ endif }
         \BLOCK{ endfor }
     \end{rSection}
 \BLOCK{ endif }
