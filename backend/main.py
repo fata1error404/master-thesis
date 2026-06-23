@@ -3,6 +3,7 @@ import json
 import asyncio
 import base64
 import re
+import copy
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -103,6 +104,130 @@ def read_pdf_text(file_name: str) -> str:
     resume_text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]+", " ", resume_text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in resume_text.split("\n")]
     return "\n".join(lines)
+
+
+def _normalize_compare_text(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def _entry_compare_key(entry: Dict[str, Any], fields: list[str]) -> str:
+    return "::".join(_normalize_compare_text(entry.get(field)) for field in fields)
+
+
+def _is_award_or_funding_text(text: Any) -> bool:
+    normalized = _normalize_compare_text(text)
+    if re.search(r"\$\s*\d", normalized) and any(
+        term in normalized
+        for term in ("hackathon", "competition", "prize", "winner", "fund", "foundation")
+    ):
+        return True
+
+    return any(
+        term in normalized
+        for term in (
+            "1st place",
+            "first place",
+            "prize winner",
+            "hackathon",
+            "university startup",
+            "ton foundation",
+            "innovation promotion fund",
+            "competition",
+            "award",
+            "grant",
+        )
+    )
+
+
+def _token_set(text: Any) -> set[str]:
+    return set(re.findall(r"[a-z0-9+#]+", _normalize_compare_text(text)))
+
+
+def _should_highlight_tailored_bullet(
+    tailored_bullet: Any,
+    original_entry: Dict[str, Any] | None,
+) -> bool:
+    if not isinstance(tailored_bullet, str) or not tailored_bullet.strip():
+        return False
+    if _is_award_or_funding_text(tailored_bullet):
+        return False
+    if not original_entry:
+        return True
+
+    original_bullets = [
+        bullet
+        for bullet in original_entry.get("description", []) or []
+        if isinstance(bullet, str) and bullet.strip()
+    ]
+    tailored_norm = _normalize_compare_text(tailored_bullet)
+
+    for original_bullet in original_bullets:
+        original_norm = _normalize_compare_text(original_bullet)
+        if tailored_norm == original_norm or tailored_norm in original_norm or original_norm in tailored_norm:
+            return False
+
+    original_text = " ".join(str(value) for value in original_entry.values())
+    original_tokens = _token_set(original_text)
+    tailored_tokens = {token for token in _token_set(tailored_bullet) if len(token) >= 3}
+    if not tailored_tokens:
+        return False
+
+    new_tokens = tailored_tokens - original_tokens
+    new_token_ratio = len(new_tokens) / max(len(tailored_tokens), 1)
+
+    return len(new_tokens) >= 3 and new_token_ratio >= 0.25
+
+
+def build_compare_resume_data(
+    original_resume: Dict[str, Any] | None,
+    tailored_resume: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    compare_resume = copy.deepcopy(tailored_resume or {})
+    original_resume = original_resume or {}
+
+    section_keys = {
+        "work_experience_section": ["company", "role"],
+        "projects_section": ["name"],
+    }
+
+    for section_key, key_fields in section_keys.items():
+        original_items = {
+            _entry_compare_key(item, key_fields): item
+            for item in original_resume.get(section_key, []) or []
+            if isinstance(item, dict)
+        }
+
+        for item in compare_resume.get(section_key, []) or []:
+            if not isinstance(item, dict):
+                continue
+
+            original_item = original_items.get(_entry_compare_key(item, key_fields))
+            highlighted_description = []
+            for bullet in item.get("description", []) or []:
+                highlight = _should_highlight_tailored_bullet(bullet, original_item)
+                highlighted_description.append({
+                    "text": bullet,
+                    "highlight": highlight,
+                })
+            item["description"] = highlighted_description
+
+    return compare_resume
+
+
+def write_compare_resume_json(
+    original_resume: Dict[str, Any] | None,
+    tailored_resume: Dict[str, Any] | None,
+    output_dir: str,
+) -> Path:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    compare_path = output_path / "resume_tailored_compare.json"
+    compare_data = build_compare_resume_data(original_resume, tailored_resume)
+
+    with compare_path.open("w", encoding="utf-8") as f:
+        json.dump(compare_data, f, indent=2, ensure_ascii=False)
+
+    return compare_path
 
 
 @app.get("/")
@@ -332,11 +457,35 @@ async def tailor(request: TailorRequest):
 
             new_pdf_base64 = base64.b64encode(new_pdf_bytes).decode("utf-8")
 
+            compare_json_path = await asyncio.to_thread(
+                write_compare_resume_json,
+                state.resume_original_data,
+                state.resume_tailored_data,
+                OUTPUT_DIR,
+            )
+
+            compare_pdf_path = await asyncio.to_thread(
+                lambda: json_to_pdf(
+                    compare_json_path,
+                    template_name="resume_compare.tex.jinja",
+                    output_stem="resume_compare",
+                    write_overleaf_zip=False,
+                )
+            )
+
+            compare_pdf_bytes = await asyncio.to_thread(
+                compare_pdf_path.read_bytes
+            )
+            await asyncio.to_thread(cleanup_latex_artifacts, compare_pdf_path)
+
+            compare_pdf_base64 = base64.b64encode(compare_pdf_bytes).decode("utf-8")
+
             yield json.dumps({
                 "type": "resume_tailored_pdf",
                 "data": {
                     "original_pdf_content_base64": original_pdf_base64,
-                    "new_pdf_content_base64": new_pdf_base64}
+                    "new_pdf_content_base64": new_pdf_base64,
+                    "compare_pdf_content_base64": compare_pdf_base64}
             }) + "\n"
 
             await asyncio.sleep(0)

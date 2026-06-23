@@ -65,6 +65,7 @@ export default function CVGenerationPage() {
 
     const [pdfGenerationStatus, setPdfGenerationStatus] = useState("");
     const [newPdfURL, setNewPdfURL] = useState<string | null>(null);
+    const [comparePdfURL, setComparePdfURL] = useState<string | null>(null);
     const [originalPdfURL, setOriginalPdfURL] = useState<string | null>(null);
     const [isPdfGenerationSuccess, setIsPdfGenerationSuccess] = useState(false);
 
@@ -249,31 +250,33 @@ export default function CVGenerationPage() {
                         }
 
                         if (event.type === "resume_tailored_pdf") {
+                            const pdfUrlFromBase64 = (base64: string) => {
+                                const binary = atob(base64);
+                                const bytes = new Uint8Array(binary.length);
+
+                                for (let i = 0; i < binary.length; i++) {
+                                    bytes[i] = binary.charCodeAt(i);
+                                }
+
+                                const blob = new Blob([bytes], { type: "application/pdf" });
+                                return URL.createObjectURL(blob);
+                            };
+
                             const new_base64 = event.data.new_pdf_content_base64;
-                            const newBinary = atob(new_base64);
-                            const newBytes = new Uint8Array(newBinary.length);
-
-                            for (let i = 0; i < newBinary.length; i++) {
-                                newBytes[i] = newBinary.charCodeAt(i);
-                            }
-
-                            const newBlob = new Blob([newBytes], { type: "application/pdf" });
-                            const newUrl = URL.createObjectURL(newBlob);
+                            const newUrl = pdfUrlFromBase64(new_base64);
 
                             setNewPdfURL(newUrl);
 
                             const original_base64 = event.data.original_pdf_content_base64;
-                            const originalBinary = atob(original_base64);
-                            const originalBytes = new Uint8Array(originalBinary.length);
-
-                            for (let i = 0; i < originalBinary.length; i++) {
-                                originalBytes[i] = originalBinary.charCodeAt(i);
-                            }
-
-                            const originalBlob = new Blob([originalBytes], { type: "application/pdf" });
-                            const originalUrl = URL.createObjectURL(originalBlob);
+                            const originalUrl = pdfUrlFromBase64(original_base64);
 
                             setOriginalPdfURL(originalUrl);
+
+                            if (event.data.compare_pdf_content_base64) {
+                                setComparePdfURL(pdfUrlFromBase64(event.data.compare_pdf_content_base64));
+                            } else {
+                                setComparePdfURL(newUrl);
+                            }
 
                             setIsPdfGenerationSuccess(true);
                             setPdfGenerationStatus("Done ✔️");
@@ -643,11 +646,23 @@ export default function CVGenerationPage() {
                                 </button>
                             </div>
 
-                            <div className="popup-text"> Tailoring completed for: </div>
+                            <div style={{ color: "#b0b0b0", fontFamily: "monospace", fontSize: "0.9rem", marginLeft: "1rem" }}> Tailoring completed for: </div>
 
                             <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Job Title:</span> {jobTitle} </div>
                             <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Job Purpose:</span> {jobPurpose} </div>
                             <div className="popup-text"> <span style={{ fontWeight: "bold" }}>Company Name:</span> {jobCompanyName} </div>
+                            <div className="popup-text" style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                                <span
+                                    style={{
+                                        display: "inline-block",
+                                        width: "1.8rem",
+                                        height: "0.8rem",
+                                        background: "rgb(255, 242, 153)",
+                                        border: "1px solid rgba(255, 255, 255, 0.35)",
+                                    }}
+                                />
+                                <span style={{ color: "#b0b0b0", fontFamily: "monospace", fontSize: "0.8rem" }}>– newly generated text</span>
+                            </div>
 
                             {!isCompareClosing && isComparePopupReady && (
                                 <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
@@ -664,7 +679,7 @@ export default function CVGenerationPage() {
 
                                     <div style={{ flex: 1, aspectRatio: "1 / 1.414" }}>
                                         <iframe
-                                            src={`${newPdfURL}#toolbar=0`}
+                                            src={`${comparePdfURL || newPdfURL}#toolbar=0`}
                                             style={{
                                                 width: "100%",
                                                 height: "100%",

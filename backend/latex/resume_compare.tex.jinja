@@ -1,0 +1,157 @@
+%==== PACKAGES AND OTHER DOCUMENT CONFIGURATIONS  ====%
+\documentclass{resume}
+\usepackage[left=0.25in,top=0.25in,right=0.25in,bottom=0.25in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor}
+\usepackage{lmodern}
+\usepackage{fontawesome}
+\usepackage{textcomp}
+\usepackage{hyperref}
+
+\definecolor{myblue}{RGB}{0, 164, 218}
+\definecolor{tailoredHighlight}{RGB}{255, 242, 153}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=myblue,
+    citecolor=myblue,
+    urlcolor=myblue
+}
+
+%==== Headings ====%
+\name{\VAR{name}}
+
+\address{
+\BLOCK{ if phone }{\faPhone} \href{tel:\VAR{phone}}{\VAR{phone.replace(' ','')}} \quad \BLOCK{ endif }
+\BLOCK{ if email }{\faEnvelope} \href{mailto:\VAR{email}}{\VAR{email}} \quad \BLOCK{ endif }
+\BLOCK{ if media.github }{\faGithub} \href{\VAR{media.github}}{\nolinkurl{\VAR{media.github}}} \quad \BLOCK{ endif }
+\BLOCK{ if media.linkedin }{\faLinkedin} \href{\VAR{media.linkedin}}{\nolinkurl{\VAR{media.linkedin}}} \BLOCK{ endif }
+}
+
+\begin{document}
+
+%===== WORK EXPERIENCE SECTION =====%
+\BLOCK{ if work_experience_section }
+    \begin{rSection}{Work Experience}
+        \BLOCK{ for exp in work_experience_section }
+            \BLOCK{ if exp.description }
+            \begin{rSubsection}
+                {\VAR{exp.role}}
+                {\BLOCK{ if exp.from_date and exp.to_date }\VAR{exp.from_date} - \VAR{exp.to_date}\BLOCK{ elif exp.from_date }\VAR{exp.from_date}\BLOCK{ elif exp.to_date }\VAR{exp.to_date}\BLOCK{ endif }}
+                \BLOCK{ if exp.link is defined and exp.link }
+                    {\normalfont{\textit{\href{\VAR{exp.link}}{\VAR{exp.company}}}}}
+                \BLOCK{ else }
+                    {\normalfont{\textit{\VAR{exp.company}}}}
+                \BLOCK{ endif }
+                {\normalfont{\textit{\BLOCK{ if exp.location }\VAR{exp.location}\BLOCK{ endif }}}}
+                \BLOCK{ for point in exp.description }
+                    \item \BLOCK{ if point is mapping and point.highlight }\colorbox{tailoredHighlight}{\parbox[t]{0.94\linewidth}{\strut \VAR{point.text}\strut}}\BLOCK{ elif point is mapping }\VAR{point.text}\BLOCK{ else }\VAR{point}\BLOCK{ endif }
+                \BLOCK{ endfor }
+            \end{rSubsection}
+            \BLOCK{ else }
+                \textbf{\VAR{exp.role}} \hfill {\BLOCK{ if exp.from_date and exp.to_date }\VAR{exp.from_date} - \VAR{exp.to_date}\BLOCK{ elif exp.from_date }\VAR{exp.from_date}\BLOCK{ elif exp.to_date }\VAR{exp.to_date}\BLOCK{ endif }}\\
+                \textit{\VAR{exp.company}}\BLOCK{ if exp.location } \hfill \textit{\VAR{exp.location}}\BLOCK{ endif }\par\smallskip
+            \BLOCK{ endif }
+        \BLOCK{ endfor }
+    \end{rSection}
+\BLOCK{ endif }
+
+%==== EDUCATION SECTION ====
+\BLOCK{ if education_section }
+\begin{rSection}{Education}
+    \BLOCK{ for school in education_section }
+        \BLOCK{ if school.university }
+            \textbf{\VAR{school.university}} \hfill {\BLOCK{ if school.from_date and school.to_date }\VAR{school.from_date} - \VAR{school.to_date}\BLOCK{ elif school.from_date }\VAR{school.from_date}\BLOCK{ elif school.to_date }\VAR{school.to_date}\BLOCK{ endif }} \\
+            \BLOCK{ if school.department is defined and school.department }
+                {\VAR{school.department}} \\
+            \BLOCK{ endif }
+            \BLOCK{ if school.degree }
+                {\VAR{school.degree}}
+                \BLOCK{ if school.grade is defined and school.grade }
+                    \hfill {(GPA: \VAR{school.grade})}
+                \BLOCK{ endif }
+                \\
+            \BLOCK{ elif school.grade is defined and school.grade }
+                {(GPA: \VAR{school.grade})} \\
+            \BLOCK{ endif }
+            \BLOCK{ if school.highlights is defined and school.highlights }
+                \BLOCK{ for highlight in school.highlights }
+                    \hspace{1em}{\tiny$\bullet$}\hspace{0.35em}\VAR{highlight} \\
+                \BLOCK{ endfor }
+            \BLOCK{ endif }
+            \BLOCK{ if school.courses is defined and school.courses }
+                \textbf{\textit{Relevant Courses:}} \textit{\VAR{school.courses | join(', ')}} \\
+            \BLOCK{ endif }
+            \vspace{0.25em}
+        \BLOCK{ endif }
+    \BLOCK{ endfor }
+\end{rSection}
+\BLOCK{ endif }
+
+%==== PROJECTS SECTION ====
+\BLOCK{ if projects_section }
+    \begin{rSection}{Projects}
+        \BLOCK{ for project in projects_section }
+            \BLOCK{ if project.description }
+            \begin{rSubsection}
+                \BLOCK{ if project.link }
+                    {\href{\VAR{project.link}}{\VAR{project.name}}}
+                \BLOCK{ else }
+                    {\VAR{project.name}}
+                \BLOCK{ endif }
+                {\normalfont{\BLOCK{ if project.from_date and project.to_date }\VAR{project.from_date} - \VAR{project.to_date}\BLOCK{ elif project.from_date }\VAR{project.from_date}\BLOCK{ elif project.to_date }\VAR{project.to_date}\BLOCK{ endif }}}{}{}
+                \BLOCK{ for point in project.description }
+                    \item \BLOCK{ if point is mapping and point.highlight }\colorbox{tailoredHighlight}{\parbox[t]{0.94\linewidth}{\strut \VAR{point.text}\strut}}\BLOCK{ elif point is mapping }\VAR{point.text}\BLOCK{ else }\VAR{point}\BLOCK{ endif }
+                \BLOCK{ endfor }
+            \end{rSubsection}
+            \BLOCK{ else }
+                \BLOCK{ if project.link }
+                    \textbf{\href{\VAR{project.link}}{\VAR{project.name}}}
+                \BLOCK{ else }
+                    \textbf{\VAR{project.name}}
+                \BLOCK{ endif }
+                \BLOCK{ if project.from_date or project.to_date }
+                    \hfill {\normalfont{\BLOCK{ if project.from_date and project.to_date }\VAR{project.from_date} - \VAR{project.to_date}\BLOCK{ elif project.from_date }\VAR{project.from_date}\BLOCK{ elif project.to_date }\VAR{project.to_date}\BLOCK{ endif }}}
+                \BLOCK{ endif }
+                \par\smallskip
+            \BLOCK{ endif }
+        \BLOCK{ endfor }
+    \end{rSection}
+\BLOCK{ endif }
+
+%==== TECHNICAL STRENGTHS SECTION ====
+\BLOCK{ if skills_section or certifications_section }
+    \begin{rSection}{Technical Skills}
+        \begin{tabular}{ @{} l @{\hspace{1ex}} l }
+            \BLOCK{ for section in skills_section }
+                \textbf{\VAR{section.name}}: \VAR{section.skills | join(', ')}\\
+            \BLOCK{ endfor }
+            \BLOCK{ if certifications_section }
+                \textbf{Certifications:}
+                \BLOCK{ for certification in certifications_section }
+                    \BLOCK{ if certification.link }
+                        \href{\VAR{certification.link}}{\textbf{\VAR{certification.name}}}
+                    \BLOCK{ else }
+                        \textbf{\VAR{certification.name}}
+                    \BLOCK{ endif }\\
+                \BLOCK{ endfor }
+            \BLOCK{ endif }
+        \end{tabular}
+    \end{rSection}
+\BLOCK{ endif }
+
+%==== ACHIEVEMENTS SECTION ====
+\BLOCK{ if achievements_section }
+    \begin{rSection}{Achievements}
+        \begin{rSubsection}{}{}{}{}
+            \BLOCK{ for point in achievements_section }
+                \item \VAR{point.name}
+            \BLOCK{ endfor }
+        \end{rSubsection}
+    \end{rSection}
+\BLOCK{ endif }
+
+\newcommand\myfontsize{\fontsize{0.1pt}{0.1pt}\selectfont} \myfontsize \color{white}
+\VAR{keywords}, \VAR{keywords}, {artificial intelligence engineer, azure cognitive services exp, azure services, core azure services, azure cognitive and generative ai, genai, aws, gcp, java, clean, efficient, maintainable code, react, front end, back end, ai solutions, data analysis, pretrained models, automl, software development principles, version control, testing, continuous integration and deployment, python, javascript, prompt engieering, frontend, backend, html, css, api, angular, development, machine learning, artificial intelligence, deep learning, data warehouse, data modeling, data extraction, data transformation, data loading, sql, etl, data quality, data governance, data privacy, data visualization, data controls, privacy, security, compliance, sla, aws, terabyte to petabyte scale data, full stack software development, cloud, security engineering, security architecture, ai/ml engineering, technical product management, microsoft office, google suite, visualization tools, scripting, coding, programming languages, analytical skills, collaboration, leadership, communication, presentation skills, computer vision, senior, ms or ph.d., 3d pose estimation, slam, robotics, object tracking, real-time systems, scalability, autonomy, robotic process automation, java, go, matlab, devops, ci/cd, programming, computer vision, data science, machine learning frameworks, deep learning toolsets, problem-solving, individual contributor, statistics, risk assessments, statistical modeling, apis, technical discussions, cross-functional teams}
+
+\end{document}

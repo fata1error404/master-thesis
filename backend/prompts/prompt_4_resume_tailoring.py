@@ -10,18 +10,13 @@ Instructions:
 1. Focus: Prioritize work experiences that are most aligned with the job description.
 2. Content:
   2.1. Preserve all achievement, award, funding, competition, hackathon, prize, ranking, and grant bullets verbatim. Do not rewrite, expand, paraphrase, reorder internally, or add job-description keywords to these achievement facts.
-  2.2. For each work experience that is strongly related to the job description, ensure there are at least 2 non-achievement bullet points in addition to any preserved achievement bullets.
-  2.3. Rewrite related non-achievement bullets in a richer way: describe concrete implemented features, UI flows, architecture, data/API integration, tools, or technical decisions grounded in the original work details.
-  2.4. For related non-achievement work bullets, use the XYZ idea where natural: did X, using Y, to improve Z. Do not force fake metrics. If no metric is supported, express Z as a concrete product, engineering, maintainability, performance, integration, or workflow outcome.
-  2.5. If the original related work description is short, infer only feature categories that are implied by the role, company/project context, original bullet, and supported skills. Do not invent named features, exact metrics, team sizes, customers, employers, dates, or tools.
-  2.6. For work experiences weakly related to the job description, keep bullets concise and avoid aggressive rewriting.
-  2.7. Honesty: Prioritize truthfulness, objective language, and content preservation.
-  2.8. Specificity: Prefer concrete implementation details over generic phrases such as "enhanced user experience", "innovative solutions", "modern web applications", or "improved performance" unless the original evidence supports what was enhanced or improved.
+  2.2. For work experiences strongly related to the job description, ensure there are at least 2 non-achievement bullet points in addition to any preserved achievement bullets.
+  2.3. Rewrite these related non-achievement bullets in a richer way. Firstly, you must use XYZ formula everywhere: did X, using Y, to improve Z (metric). Secondly, it must not sound general: describe concrete implemented feature or technical decision grounded (if possible) in the original work details (if they are weak, generate a fake one).
+  2.4. For work experiences weakly related to the job description, keep bullets concise and avoid aggressive rewriting.
 3. Style:
   3.1. Clarity: Clear expression trumps impressiveness.
   3.2. Voice: Use active voice whenever possible.
   3.3. Proofreading: Ensure impeccable spelling and grammar.
-  3.4. The output must not sound like generic AI resume prose.
 
 <work_experience_section>
     {section_data}

@@ -242,9 +242,11 @@ def json_to_pdf(
     template_dir: str | Path = DEFAULT_TEMPLATE_DIR,
     output_dir: str | Path = DEFAULT_OUTPUT_DIR,
     template_name: str = DEFAULT_TEMPLATE_NAME,
+    output_stem: str = "resume",
+    write_overleaf_zip: bool = True,
 ) -> Path:
     output_dir = Path(output_dir)
-    tex_path = output_dir / "resume.tex"
+    tex_path = output_dir / f"{output_stem}.tex"
 
     rendered_tex_path = render_tex(
         json_path=json_path,
@@ -262,11 +264,12 @@ def json_to_pdf(
     if cls_path.resolve() != staged_cls_path.resolve():
         shutil.copy2(cls_path, staged_cls_path)
 
-    zip_path = output_dir / "overleaf.zip"
+    if write_overleaf_zip:
+        zip_path = output_dir / "overleaf.zip"
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(rendered_tex_path, arcname="resume.tex")
-        zipf.write(staged_cls_path, arcname="resume.cls")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(rendered_tex_path, arcname="resume.tex")
+            zipf.write(staged_cls_path, arcname="resume.cls")
 
     # return rendered_tex_path
     return compile_pdf(tex_path=rendered_tex_path, output_dir=output_dir)
