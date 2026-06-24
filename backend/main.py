@@ -185,6 +185,14 @@ def build_compare_resume_data(
     compare_resume = copy.deepcopy(tailored_resume or {})
     original_resume = original_resume or {}
 
+    original_summary = _normalize_compare_text(original_resume.get("summary"))
+    tailored_summary = compare_resume.get("summary")
+    if isinstance(tailored_summary, str) and tailored_summary.strip():
+        compare_resume["summary"] = {
+            "text": tailored_summary,
+            "highlight": _normalize_compare_text(tailored_summary) != original_summary,
+        }
+
     section_keys = {
         "work_experience_section": ["company", "role"],
         "projects_section": ["name"],

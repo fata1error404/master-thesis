@@ -18,6 +18,12 @@ RESUME_DETAILS_EXTRACTOR = """
 
     2. Extract Information:
     - Systematically parse each section, extracting relevant details.
+    - If the resume contains a person self-description, profile, summary, objective, bio, "about me",
+      or short introductory paragraph near the candidate name/contact information, extract it into
+      the top-level "summary" field.
+    - Preserve the author's original wording, tone, and point of view for the "summary" field as much
+      as possible; do not convert it into bullet points or scatter it across other sections.
+    - If there is no explicit person self-description, set "summary" to null or an empty string.
     - Pay attention to dates, titles, organizations, and descriptions.
     - In education, preserve department/faculty/program names, GPA/grade, honors, thesis titles, scholarships, selective programs, and university ranking/prestige facts exactly when present.
     - Put department/faculty/program names in the education "department" field; do not convert them into a generic degree.

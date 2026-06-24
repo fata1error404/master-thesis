@@ -30,6 +30,12 @@
 
 \begin{document}
 
+\BLOCK{ if summary }
+    \vspace{-0.35em}
+    \noindent \BLOCK{ if summary is mapping and summary.highlight }\colorbox{tailoredHighlight}{\parbox[t]{0.96\linewidth}{\strut \VAR{summary.text}\strut}}\BLOCK{ elif summary is mapping }\VAR{summary.text}\BLOCK{ else }\VAR{summary}\BLOCK{ endif }\par
+    \vspace{0.45em}
+\BLOCK{ endif }
+
 %===== WORK EXPERIENCE SECTION =====%
 \BLOCK{ if work_experience_section }
     \begin{rSection}{Work Experience}

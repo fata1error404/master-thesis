@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from prompts.prompt_4_resume_tailoring import PROJECTS, WORK_EXPERIENCE
+from prompts.prompt_4_resume_tailoring import PERSON_DESCRIPTION, PROJECTS, WORK_EXPERIENCE
 from schemas.resume_schema import Resume
 
 
@@ -17,6 +17,10 @@ class BulletRewrite(BaseModel):
 
 class BulletRewriteList(BaseModel):
     bullets: List[str] = Field(description="Factually supported rewritten resume bullets.")
+
+
+class SummaryRewrite(BaseModel):
+    summary: str = Field(description="Factually supported person description / resume summary.")
 
 
 bullet_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
@@ -125,6 +129,7 @@ FRONTEND_EXPANSION_TERMS = {
 }
 
 MAX_BULLET_CHARS = 165
+MAX_SUMMARY_CHARS = 430
 MAX_PROJECTS_ONE_PAGE = 3
 MAX_COURSES_PER_SCHOOL = 6
 
@@ -599,6 +604,222 @@ def _build_tailoring_plan(job_details: Dict[str, Any], resume_data: Dict[str, An
         "supported_text": supported_resume_text,
         "supported_tokens": _tokens(supported_resume_text + "\n" + "\n".join(resume_skills)),
     }
+
+
+def _resume_evidence_for_summary(resume_data: Dict[str, Any]) -> str:
+    evidence = {
+        "summary": resume_data.get("summary"),
+        "skills_section": resume_data.get("skills_section", []),
+        "work_experience_section": resume_data.get("work_experience_section", []),
+        "projects_section": resume_data.get("projects_section", []),
+        "education_section": resume_data.get("education_section", []),
+        "certifications_section": resume_data.get("certifications_section", []),
+        "achievements_section": resume_data.get("achievements_section", []),
+    }
+    return "\n".join(_text_parts(evidence))
+
+
+def _summary_style_guidance(original_summary: str) -> str:
+    if not original_summary:
+        return "No original person description exists; write exactly two concise resume-summary sentences."
+
+    pronoun_hint = "Preserve first-person voice." if re.search(r"\b(I|I'm|I am|my|me)\b", original_summary) else "Avoid first-person pronouns."
+    sentence_count = len([part for part in re.split(r"[.!?]+", original_summary) if part.strip()])
+
+    return (
+        f"Original summary has about {sentence_count or 1} sentence(s). "
+        f"{pronoun_hint} Use it only as style and tone reference; generate new target-job-aligned content."
+    )
+
+
+def _current_position_from_original_summary(original_summary: str) -> str:
+    normalized = _normalize_for_match(original_summary)
+    if not normalized:
+        return ""
+
+    if "master" in normalized and "student" in normalized:
+        return "Master's student"
+    if "phd" in normalized and "student" in normalized:
+        return "PhD student"
+    if "doctoral" in normalized and "student" in normalized:
+        return "Doctoral student"
+    if "undergraduate" in normalized and "student" in normalized:
+        return "Undergraduate student"
+    if "student" in normalized:
+        return "Student"
+
+    return ""
+
+
+def _summary_alignment_score(summary: str, plan: Dict[str, Any]) -> float:
+    return _relevance_score(summary, plan) + _domain_signal_score(summary, plan["job_domain_weights"])
+
+
+def _looks_like_skill_inventory(summary: str, plan: Dict[str, Any]) -> bool:
+    normalized = _normalize_for_match(summary)
+    bad_phrases = (
+        "experience across",
+        "skilled in",
+        "proficient in",
+        "technical skills",
+        "tech stack",
+        "programming languages",
+        "tools and technologies",
+    )
+    if any(phrase in normalized for phrase in bad_phrases):
+        return True
+
+    explicit_technology_terms = (
+        "c++",
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "next.js",
+        "next js",
+        "node.js",
+        "node js",
+        "sql",
+        "pytorch",
+        "tensorflow",
+        "mongodb",
+        "redis",
+        "aws",
+        "azure",
+        "gcp",
+    )
+    if any(term in normalized for term in explicit_technology_terms):
+        return True
+
+    mentioned_skills = [
+        skill
+        for skill in plan["resume_skills"]
+        if _normalize_for_match(skill) and _normalize_for_match(skill) in normalized
+    ]
+    if len(mentioned_skills) >= 3:
+        return True
+
+    return bool(re.search(r"\b(?:C\+\+|Python|JavaScript|TypeScript|React|Next\.?js|Node\.?js|SQL|PyTorch)\b(?:,\s*\b(?:C\+\+|Python|JavaScript|TypeScript|React|Next\.?js|Node\.?js|SQL|PyTorch)\b){1,}", summary))
+
+
+def _summary_supported(summary: str, original_summary: str, resume_evidence: str, plan: Dict[str, Any]) -> bool:
+    if not summary.strip() or _is_missing_value(summary):
+        return False
+
+    if len(summary) > MAX_SUMMARY_CHARS:
+        return False
+
+    if _looks_like_skill_inventory(summary, plan):
+        return False
+
+    if "student" in _normalize_for_match(summary) and not _current_position_from_original_summary(original_summary):
+        return False
+
+    evidence = f"{original_summary}\n{resume_evidence}"
+    if _generated_numbers_are_reasonable(original_summary, summary, evidence, plan) is False:
+        return False
+
+    if _missing_strong_facts(original_summary, summary):
+        return False
+
+    unsupported = _unsupported_terms(summary, evidence, plan)
+    if unsupported:
+        return False
+
+    if original_summary:
+        original_alignment = _summary_alignment_score(original_summary, plan)
+        generated_alignment = _summary_alignment_score(summary, plan)
+        if generated_alignment <= original_alignment:
+            return False
+
+    return True
+
+
+def _fallback_generated_summary(job_details: Dict[str, Any], plan: Dict[str, Any]) -> str:
+    return _fallback_generated_summary_from_context(job_details, plan, "")
+
+
+def _fallback_generated_summary_from_context(
+    job_details: Dict[str, Any],
+    plan: Dict[str, Any],
+    original_summary: str,
+) -> str:
+    job_title = str(job_details.get("job_title") or "the target role").strip()
+    current_position = _current_position_from_original_summary(original_summary)
+    subject = f"{current_position} with" if current_position else "Candidate with"
+
+    role_lower = job_title.lower()
+    if "front" in role_lower or "ui" in role_lower or "web" in role_lower:
+        interest = "a keen interest in building interactive, user-friendly interfaces"
+        craft = "frontend experiences that are clear, responsive, and easy to use"
+    elif "machine learning" in role_lower or "ai" in role_lower or "data" in role_lower:
+        interest = "a keen interest in turning applied AI ideas into useful, reliable products"
+        craft = "systems that connect model behavior with practical user needs"
+    else:
+        interest = f"a keen interest in the work of {job_title}"
+        craft = "practical solutions that are clear, reliable, and useful"
+
+    return (
+        f"{subject} {interest}. "
+        f"Brings careful problem-solving, clear communication, and a collaborative mindset to building {craft}."
+    )
+
+
+def _tailor_summary(
+    resume_data: Dict[str, Any],
+    job_details: Dict[str, Any],
+    plan: Dict[str, Any],
+) -> str:
+    original_summary = str(resume_data.get("summary") or "").strip()
+    resume_evidence = _resume_evidence_for_summary(resume_data)
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You tailor one resume person description for a target job. "
+                    "Use the application prompt exactly. Return only the structured summary field. "
+                    "Always generate a fresh summary. Do not invent facts; use the original summary only as style reference."
+                ),
+            ),
+            (
+                "human",
+                (
+                    "{summary_prompt}\n\n"
+                    "Target job details:\n{job_details}\n\n"
+                    "Supported resume skills:\n{resume_skills}\n\n"
+                    "Style guidance:\n{style_guidance}\n\n"
+                    "Return a new two-sentence summary that is more aligned with the target job than the original. "
+                    "Do not list skills or technologies; write about role interest and working qualities."
+                ),
+            ),
+        ]
+    )
+
+    try:
+        chain = prompt | bullet_llm.with_structured_output(SummaryRewrite, method="function_calling")
+        response = chain.invoke(
+            {
+                "summary_prompt": PERSON_DESCRIPTION.format(
+                    original_summary=original_summary or "(none)",
+                    resume_evidence=resume_evidence,
+                    job_description=json.dumps(job_details, ensure_ascii=False),
+                ),
+                "job_details": json.dumps(job_details, ensure_ascii=False),
+                "resume_skills": json.dumps(plan["resume_skills"], ensure_ascii=False),
+                "style_guidance": _summary_style_guidance(original_summary),
+            }
+        )
+        summary = " ".join(response.summary.split())
+    except Exception as e:
+        print(f"Error tailoring summary: {e}")
+        return _fallback_generated_summary_from_context(job_details, plan, original_summary)
+
+    if not _summary_supported(summary, original_summary, resume_evidence, plan):
+        return _fallback_generated_summary_from_context(job_details, plan, original_summary)
+
+    return summary
 
 
 def _domain_signal_score(text: str, domain_weights: Dict[str, float]) -> float:
@@ -1281,7 +1502,7 @@ def build_resume(
     # append static fields from input resume
     tailored_resume = {
         "name": resume_data["name"],
-        "summary": resume_data.get("summary"),  # optional field in schema
+        "summary": _tailor_summary(resume_data, job_details, plan),
         "phone": resume_data["phone"],
         "email": resume_data["email"],
         "media": {

@@ -1,3 +1,45 @@
+PERSON_DESCRIPTION = """
+You are going to write the applicant's person self-description / resume summary for a target job.
+
+The output must be a single JSON field named "summary".
+
+Decision policy:
+1. Always generate a fresh person description for the target job.
+2. If the original person description exists, use it only as a reference for the author's style, tone,
+   point of view, sentence rhythm, and level of formality. Do not copy it unchanged.
+3. If the original person description does not exist, generate a two-sentence person description aligned with the target job.
+
+Truthfulness:
+- Do not invent employers, degrees, dates, awards, certifications, links, exact metrics, seniority, or technologies.
+- Every factual claim must be supported by the resume evidence supplied to you.
+- Do not list skills or technologies in the person description.
+- You may imply supported domains, interests, projects, education, and work evidence that are relevant to the target job.
+- If the resume evidence is thin, keep the summary general rather than fabricating details.
+- Mention the person's current position, such as "Master's student", if and only if the original person description explicitly contains that current position.
+
+Style:
+- Clear, polished, human resume prose.
+- No bullet points.
+- No first-person pronouns unless the original person description uses them.
+- Use exactly two concise sentences.
+- The first sentence should express target-role interest, for example a keen interest in building interactive, user-friendly interfaces.
+- The second sentence should add human working qualities such as communication, collaboration, ownership, problem-solving, attention to detail, or learning mindset.
+- Avoid phrases like "experience across", "skilled in", "proficient in", "technical skills", "tech stack", or comma-separated skill lists.
+
+<original_person_description>
+    {original_summary}
+</original_person_description>
+
+<resume_evidence>
+    {resume_evidence}
+</resume_evidence>
+
+<job_description>
+    {job_description}
+</job_description>
+"""
+
+
 WORK_EXPERIENCE = """
 You are going to write a JSON resume section of "Work Experience" for an applicant applying for job posts.
 

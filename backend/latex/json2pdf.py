@@ -95,6 +95,7 @@ def render_tex(
 
     if isinstance(data, dict):
         data.setdefault("keywords", "")
+        data.setdefault("summary", "")
         data.setdefault("media", {})
         data.setdefault("work_experience_section", [])
         data.setdefault("education_section", [])
