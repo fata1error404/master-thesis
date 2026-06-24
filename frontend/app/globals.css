@@ -391,6 +391,108 @@ main {
   margin-left: 1rem;
 }
 
+.agent-chat-container {
+  background: #050505;
+  border: var(--container-border-width) solid var(--container-border);
+  border-radius: 1rem;
+  box-shadow: 0 0 10px var(--container-shadow);
+  padding: 1rem;
+}
+
+.agent-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-color);
+  font-family: monospace;
+  font-size: 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.agent-message {
+  border: 1px solid #242424;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  color: var(--text-color);
+  line-height: 1.45;
+}
+
+.agent-message-assistant {
+  background: #0b0b0b;
+}
+
+.agent-message-label {
+  color: #888;
+  font-family: monospace;
+  font-size: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.agent-question-context {
+  margin-top: 0.65rem;
+  color: #9a9a9a;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.agent-answer-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 5.5rem;
+  margin-top: 0.85rem;
+  background: #030303;
+  border: 1px solid #2a2a2a;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  color: var(--input-text-color);
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.agent-answer-input:focus {
+  outline: none;
+  border-color: #555;
+}
+
+.agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.agent-primary-button,
+.agent-secondary-button {
+  background: var(--button-bg);
+  border: 1px solid #333;
+  border-radius: 0.55rem;
+  color: var(--text-color);
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 0.82rem;
+  padding: 0.55rem 0.75rem;
+}
+
+.agent-primary-button:hover,
+.agent-secondary-button:hover {
+  background: var(--button-hover-bg);
+}
+
+.agent-primary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-status-text {
+  color: #888;
+  font-family: monospace;
+  font-size: 0.78rem;
+  margin-top: 0.8rem;
+}
+
 .expand-button {
   background: transparent;
   border: none;

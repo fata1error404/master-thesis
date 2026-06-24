@@ -9,8 +9,12 @@ export default function Home() {
   const textInputRef = useRef<HTMLDivElement | null>(null);
   const [jobDescriptionText, setJobText] = useState("");
   const [isJobDescriptionTextOverLimit, setIsJobDescriptionTextOverLimit] = useState(false);
+
+  // default settings
   const [enableRAG, setEnableRAG] = useState(true);
   const [enableKnowledgeGraph, setEnableKnowledgeGraph] = useState(true);
+  const [enableAgentMode, setEnableAgentMode] = useState(true);
+
   const [settingsTooltip, setSettingsTooltip] = useState<{
     text: string;
     top: number;
@@ -112,6 +116,7 @@ export default function Home() {
     localStorage.setItem("resume_file_name", file.name.replace(/\.pdf$/i, ""));
     localStorage.setItem("enable_rag", String(enableRAG));
     localStorage.setItem("enable_knowledge_graph", String(enableKnowledgeGraph));
+    localStorage.setItem("enable_agent_mode", String(enableAgentMode));
 
     router.push("/cv_generation");
   };
@@ -284,6 +289,34 @@ export default function Home() {
                   type="checkbox"
                   checked={enableKnowledgeGraph}
                   onChange={(e) => setEnableKnowledgeGraph(e.target.checked)}
+                />
+                <span className="switch-slider" />
+              </label>
+            </div>
+
+            <div className="settings-row">
+              <div className="settings-label-wrapper">
+                <div className="settings-label-text">Enable AI agent mode</div>
+
+                <div className="settings-tooltip">
+                  <img
+                    src="/icons/question-mark.svg"
+                    alt="AI agent setting info"
+                    className="settings-tooltip-icon"
+                    onMouseEnter={(e) => showSettingsTooltip(
+                      e,
+                      "Ask short optional questions before generation to collect more evidence about your work experience and skills related to the target job. You can skip any question."
+                    )}
+                    onMouseLeave={() => setSettingsTooltip(null)}
+                  />
+                </div>
+              </div>
+
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={enableAgentMode}
+                  onChange={(e) => setEnableAgentMode(e.target.checked)}
                 />
                 <span className="switch-slider" />
               </label>

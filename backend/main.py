@@ -10,10 +10,10 @@ from typing import Any, Dict
 from uuid import uuid4
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from langchain_chroma import Chroma
@@ -59,6 +59,8 @@ class TailorRequest(BaseModel):
     job_description: str
     enable_rag: bool = True
     enable_knowledge_graph: bool = True
+    enable_agent_mode: bool = False
+    agent_evidence: Dict[str, Any] | None = None
 
 
 app.add_middleware(
@@ -70,6 +72,7 @@ app.add_middleware(
 )
 
 OUTPUT_DIR = "outputs"
+ENABLE_AGENT_MISSING_INFO_QUESTIONS = False
 
 BASE_DIR = Path(__file__).parent
 _next_dir = BASE_DIR / ".next"
@@ -104,6 +107,317 @@ def read_pdf_text(file_name: str) -> str:
     resume_text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]+", " ", resume_text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in resume_text.split("\n")]
     return "\n".join(lines)
+
+
+def _text_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, dict):
+        values = []
+        for item in value.values():
+            values.extend(_text_values(item))
+        return values
+    if isinstance(value, list):
+        values = []
+        for item in value:
+            values.extend(_text_values(item))
+        return values
+    return [str(value)]
+
+
+def _agent_item_key(item: Dict[str, Any], fields: list[str]) -> str:
+    parts = []
+    for field in fields:
+        value = item.get(field)
+        if isinstance(value, str) and value.strip():
+            parts.append(re.sub(r"\s+", " ", re.sub(r"[^a-z0-9+#./-]+", " ", value.lower())).strip())
+    return "::".join(parts) if parts else str(uuid4())
+
+
+def _agent_tokens(text: Any) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9+#]+", str(text or "").lower())
+        if len(token) >= 3
+    }
+
+
+def _job_tokens(job_details: Dict[str, Any] | None) -> set[str]:
+    if not job_details:
+        return set()
+    generic = {
+        "and", "the", "for", "with", "you", "are", "our", "will", "that", "this",
+        "work", "team", "role", "experience", "strong", "using", "build",
+    }
+    return {
+        token
+        for token in _agent_tokens(" ".join(_text_values(job_details)))
+        if token not in generic
+    }
+
+
+def _agent_relevance_score(value: Any, job_details: Dict[str, Any] | None) -> int:
+    return len(_agent_tokens(" ".join(_text_values(value))) & _job_tokens(job_details))
+
+
+def _agent_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, list):
+        return len(value) == 0
+    return False
+
+
+def _has_feature_evidence(text: str) -> bool:
+    normalized = _normalize_compare_text(text)
+    return any(
+        term in normalized
+        for term in (
+            "implemented",
+            "built",
+            "developed",
+            "created",
+            "designed",
+            "engineered",
+            "integrated",
+            "dashboard",
+            "interface",
+            "component",
+            "page",
+            "view",
+            "form",
+            "api",
+            "bot",
+            "pipeline",
+            "model",
+            "system",
+        )
+    )
+
+
+def _has_impact_evidence(text: str) -> bool:
+    normalized = _normalize_compare_text(text)
+    if re.search(r"\b\d+(?:\.\d+)?\s*(?:%|x|ms|sec|seconds?|users?|requests?|pages?|components?|apis?|models?)\b", normalized):
+        return True
+    return any(
+        term in normalized
+        for term in (
+            "improved",
+            "increased",
+            "reduced",
+            "optimized",
+            "accelerated",
+            "faster",
+            "accuracy",
+            "performance",
+            "latency",
+            "conversion",
+            "engagement",
+            "maintainability",
+            "reliability",
+            "usability",
+        )
+    )
+
+
+def _has_collaboration_evidence(text: str) -> bool:
+    normalized = _normalize_compare_text(text)
+    return any(
+        term in normalized
+        for term in (
+            "collaborated",
+            "communicated",
+            "coordinated",
+            "worked with",
+            "partnered",
+            "team",
+            "teammates",
+            "stakeholders",
+            "designers",
+            "users",
+            "clients",
+            "cross-functional",
+            "led",
+            "mentored",
+        )
+    )
+
+
+def build_agent_question_plan(
+    resume_data: Dict[str, Any] | None,
+    job_details: Dict[str, Any] | None,
+    max_questions: int | None = None,
+) -> Dict[str, Any]:
+    resume_data = resume_data or {}
+    questions: list[Dict[str, Any]] = []
+
+    def add_question(
+        *,
+        question_id: str,
+        stage: str,
+        target_section: str,
+        target_item_key: str,
+        target_field: str,
+        question: str,
+        context: str = "",
+        priority: int = 0,
+    ) -> None:
+        if any(q["question_id"] == question_id for q in questions):
+            return
+        questions.append({
+            "question_id": question_id,
+            "stage": stage,
+            "target_section": target_section,
+            "target_item_key": target_item_key,
+            "target_field": target_field,
+            "question": question,
+            "context": context,
+            "priority": priority,
+        })
+
+    if ENABLE_AGENT_MISSING_INFO_QUESTIONS:
+        for index, edu in enumerate(resume_data.get("education_section", []) or []):
+            if not isinstance(edu, dict):
+                continue
+            key = _agent_item_key(edu, ["university", "degree"])
+            label = edu.get("university") or "this education entry"
+            if _agent_missing(edu.get("degree")):
+                add_question(
+                    question_id=f"education_{index}_degree",
+                    stage="missing_info",
+                    target_section="education_section",
+                    target_item_key=key,
+                    target_field="degree",
+                    question=f"What is the exact diploma or degree name for {label}?",
+                    context=str(label),
+                    priority=95,
+                )
+            if _agent_missing(edu.get("from_date")) or _agent_missing(edu.get("to_date")):
+                add_question(
+                    question_id=f"education_{index}_dates",
+                    stage="missing_info",
+                    target_section="education_section",
+                    target_item_key=key,
+                    target_field="from_date/to_date",
+                    question=f"What were the start and end dates for {label}?",
+                    context=str(label),
+                    priority=90,
+                )
+
+        for section_key, key_fields, label_field in (
+            ("work_experience_section", ["company", "role"], "company"),
+            ("projects_section", ["name"], "name"),
+            ("certifications_section", ["name"], "name"),
+        ):
+            for index, item in enumerate(resume_data.get(section_key, []) or []):
+                if not isinstance(item, dict):
+                    continue
+                key = _agent_item_key(item, key_fields)
+                label = item.get(label_field) or item.get("role") or "this entry"
+                if section_key != "certifications_section" and (_agent_missing(item.get("from_date")) or _agent_missing(item.get("to_date"))):
+                    add_question(
+                        question_id=f"{section_key}_{index}_dates",
+                        stage="missing_info",
+                        target_section=section_key,
+                        target_item_key=key,
+                        target_field="from_date/to_date",
+                        question=f"What were the start and end dates for {label}?",
+                        context=str(label),
+                        priority=85,
+                    )
+                if section_key == "projects_section" and _agent_missing(item.get("link")):
+                    add_question(
+                        question_id=f"project_{index}_link",
+                        stage="missing_info",
+                        target_section=section_key,
+                        target_item_key=key,
+                        target_field="link",
+                        question=f"Do you have a GitHub, demo, publication, or project link for {label}?",
+                        context=str(label),
+                        priority=70,
+                    )
+                if section_key == "certifications_section" and _agent_missing(item.get("link")):
+                    add_question(
+                        question_id=f"certification_{index}_link",
+                        stage="missing_info",
+                        target_section=section_key,
+                        target_item_key=key,
+                        target_field="link",
+                        question=f"Do you have a verification link for {label}?",
+                        context=str(label),
+                        priority=55,
+                    )
+
+    for section_key, key_fields, label_field in (
+        ("work_experience_section", ["company", "role"], "company"),
+        ("projects_section", ["name"], "name"),
+    ):
+        ranked_items = []
+        for index, item in enumerate(resume_data.get(section_key, []) or []):
+            if not isinstance(item, dict):
+                continue
+            descriptions = [
+                bullet for bullet in item.get("description", []) or []
+                if isinstance(bullet, str) and bullet.strip() and not _is_award_or_funding_text(bullet)
+            ]
+            if not descriptions:
+                continue
+            score = _agent_relevance_score(item, job_details)
+            if score <= 0:
+                continue
+            ranked_items.append((score, index, item, descriptions))
+
+        for score, index, item, descriptions in sorted(ranked_items, reverse=True)[:3]:
+            key = _agent_item_key(item, key_fields)
+            label = item.get(label_field) or item.get("role") or "this entry"
+            context = descriptions[0]
+            item_text = " ".join(_text_values(item))
+            if not _has_feature_evidence(item_text):
+                add_question(
+                    question_id=f"{section_key}_{index}_feature",
+                    stage="rewrite_evidence",
+                    target_section=section_key,
+                    target_item_key=key,
+                    target_field="description",
+                    question=f"For {label}, what exact feature, interface, or technical component did you personally implement?",
+                    context=context,
+                    priority=60 + min(score, 30),
+                )
+            if not _has_impact_evidence(item_text):
+                add_question(
+                    question_id=f"{section_key}_{index}_impact",
+                    stage="rewrite_evidence",
+                    target_section=section_key,
+                    target_item_key=key,
+                    target_field="description",
+                    question=f"For {label}, was there any measurable result or clear improvement? If not, you can say no.",
+                    context=context,
+                    priority=58 + min(score, 30),
+                )
+            if not _has_collaboration_evidence(item_text):
+                add_question(
+                    question_id=f"{section_key}_{index}_collaboration",
+                    stage="rewrite_evidence",
+                    target_section=section_key,
+                    target_item_key=key,
+                    target_field="description",
+                    question=f"For {label}, did you collaborate or communicate with teammates, users, designers, or stakeholders?",
+                    context=context,
+                    priority=52 + min(score, 25),
+                )
+
+    selected = sorted(questions, key=lambda q: q["priority"], reverse=True)
+    if max_questions is not None:
+        selected = selected[:max_questions]
+    return {
+        "enabled": True,
+        "question_count": len(selected),
+        "questions": selected,
+    }
 
 
 def _normalize_compare_text(text: Any) -> str:
@@ -255,6 +569,24 @@ async def upload(file: UploadFile = File(...)):
     return {"id": file_id}
 
 
+@app.get("/api/overleaf.zip")
+async def overleaf_zip():
+    zip_path = Path(OUTPUT_DIR) / "overleaf.zip"
+
+    if not zip_path.exists():
+        raise HTTPException(status_code=404, detail="Overleaf zip has not been generated yet.")
+
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename="overleaf.zip",
+        headers={
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
 @app.post("/api/tailor")
 async def tailor(request: TailorRequest):
     async def event_stream():
@@ -338,6 +670,29 @@ async def tailor(request: TailorRequest):
                     "fallback_message": str(fallback_error),
                 }) + "\n"
 
+        if request.enable_agent_mode and not request.agent_evidence:
+            try:
+                question_plan = await asyncio.to_thread(
+                    build_agent_question_plan,
+                    state.resume_original_data,
+                    state.job_details,
+                )
+
+                yield json.dumps({
+                    "type": "agent_questions",
+                    "data": question_plan,
+                }) + "\n"
+
+                if question_plan.get("question_count", 0) > 0:
+                    return
+
+            except Exception as e:
+                yield json.dumps({
+                    "type": "error",
+                    "step": "agent_question_planning",
+                    "message": str(e)
+                }) + "\n"
+
         try:
             if request.enable_rag:
                 vector_db = app.state.resume_vector_db
@@ -411,6 +766,7 @@ async def tailor(request: TailorRequest):
                 OUTPUT_DIR,
                 state.rag_context if request.enable_rag else None,
                 state.knowledge_graph if request.enable_knowledge_graph else None,
+                request.agent_evidence if request.enable_agent_mode else None,
             )
 
             yield json.dumps({
@@ -457,6 +813,7 @@ async def tailor(request: TailorRequest):
                 json_to_pdf,
                 "/app/outputs/resume_tailored.json"
             )
+            overleaf_zip_url = f"http://localhost:8000/api/overleaf.zip?v={uuid4()}"
 
             new_pdf_bytes = await asyncio.to_thread(
                 new_pdf_path.read_bytes
@@ -493,7 +850,9 @@ async def tailor(request: TailorRequest):
                 "data": {
                     "original_pdf_content_base64": original_pdf_base64,
                     "new_pdf_content_base64": new_pdf_base64,
-                    "compare_pdf_content_base64": compare_pdf_base64}
+                    "compare_pdf_content_base64": compare_pdf_base64,
+                    "overleaf_zip_url": overleaf_zip_url,
+                }
             }) + "\n"
 
             await asyncio.sleep(0)

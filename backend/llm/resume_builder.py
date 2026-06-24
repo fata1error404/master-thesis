@@ -1,5 +1,6 @@
 import json
 import re
+import copy
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
@@ -339,6 +340,7 @@ def build_tailoring_context(
     section_key: str,
     rag_context: Dict[str, Any] | None = None,
     knowledge_graph: Dict[str, Any] | None = None,
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> str:
     blocks = [
         "Use the following optional context only as guidance for relevance, ordering, and emphasis.",
@@ -353,10 +355,47 @@ def build_tailoring_context(
     if kg_lines:
         blocks.append("\n<KNOWLEDGE_GRAPH_CONTEXT>\n" + "\n".join(kg_lines) + "\n</KNOWLEDGE_GRAPH_CONTEXT>")
 
+    agent_lines = _format_agent_evidence(agent_evidence, section_key)
+    if agent_lines:
+        blocks.append("\n<USER_AGENT_EVIDENCE>\n" + "\n".join(agent_lines) + "\n</USER_AGENT_EVIDENCE>")
+
     if len(blocks) == 2:
         blocks.append("No extra RAG or knowledge graph context is enabled for this generation.")
 
     return "\n".join(blocks)
+
+
+def _format_agent_evidence(agent_evidence: Dict[str, Any] | None, section_key: str) -> List[str]:
+    if not agent_evidence:
+        return []
+
+    answers = agent_evidence.get("answers") or []
+    if not isinstance(answers, list):
+        return []
+
+    lines = [
+        "User-provided answers collected by AI agent mode.",
+        "Use each answer only for its referenced resume entry. Do not invent details for skipped or declined answers.",
+    ]
+
+    for answer in answers:
+        if not isinstance(answer, dict):
+            continue
+        if answer.get("target_section") != section_key:
+            continue
+        if answer.get("status") != "answered":
+            continue
+
+        text = str(answer.get("answer") or "").strip()
+        if not text:
+            continue
+
+        target = answer.get("target_item_key") or "unknown entry"
+        field = answer.get("target_field") or "description"
+        question = answer.get("question") or ""
+        lines.append(f"- entry={target}; field={field}; question={question}; answer={text}")
+
+    return lines if len(lines) > 2 else []
 
 
 def _entry_key(entry: Dict[str, Any], preferred_fields: List[str]) -> str:
@@ -365,6 +404,15 @@ def _entry_key(entry: Dict[str, Any], preferred_fields: List[str]) -> str:
         if value:
             return str(value).strip().lower()
     return json.dumps(entry, sort_keys=True, ensure_ascii=False).strip().lower()
+
+
+def _agent_item_key(entry: Dict[str, Any], fields: List[str]) -> str:
+    parts = []
+    for field in fields:
+        value = entry.get(field)
+        if isinstance(value, str) and value.strip():
+            parts.append(_normalize_for_match(value))
+    return "::".join(parts)
 
 
 def _is_missing_value(value: Any) -> bool:
@@ -514,6 +562,122 @@ def _token_list(text: str) -> List[str]:
 
 def _meaningful_strings(values: Any) -> List[str]:
     return [text for text in _text_parts(values) if not _is_missing_value(text)]
+
+
+def _agent_answer_is_negative(text: str) -> bool:
+    normalized = _normalize_for_match(text)
+    return normalized in {
+        "no",
+        "nope",
+        "none",
+        "not available",
+        "dont know",
+        "don't know",
+        "i dont know",
+        "i don't know",
+        "i dont want to answer",
+        "i don't want to answer",
+        "skip",
+    }
+
+
+def _agent_answer_lines_for_item(
+    agent_evidence: Dict[str, Any] | None,
+    section_key: str,
+    item: Dict[str, Any],
+) -> List[str]:
+    if not agent_evidence:
+        return []
+
+    key_fields = {
+        "work_experience_section": ["company", "role"],
+        "projects_section": ["name"],
+        "education_section": ["university", "degree"],
+        "certifications_section": ["name"],
+    }.get(section_key, [])
+    item_key = _agent_item_key(item, key_fields)
+
+    lines = []
+    for answer in agent_evidence.get("answers", []) or []:
+        if not isinstance(answer, dict):
+            continue
+        if answer.get("status") != "answered":
+            continue
+        if answer.get("target_section") != section_key:
+            continue
+        if answer.get("target_item_key") != item_key:
+            continue
+
+        text = str(answer.get("answer") or "").strip()
+        if not text or _agent_answer_is_negative(text):
+            continue
+
+        question = str(answer.get("question") or "").strip()
+        field = str(answer.get("target_field") or "").strip()
+        lines.append(f"{field}: {question} Answer: {text}")
+
+    return lines
+
+
+def _split_agent_date_answer(answer: str) -> tuple[str, str] | None:
+    text = " ".join(answer.split())
+    parts = re.split(r"\s+(?:-|–|—|to)\s+", text, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) != 2:
+        return None
+    start, end = parts[0].strip(), parts[1].strip()
+    if not start or not end:
+        return None
+    return start, end
+
+
+def _apply_agent_evidence_to_resume(
+    resume_data: Dict[str, Any],
+    agent_evidence: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    if not agent_evidence:
+        return resume_data
+
+    updated = copy.deepcopy(resume_data)
+    key_fields_by_section = {
+        "work_experience_section": ["company", "role"],
+        "projects_section": ["name"],
+        "education_section": ["university", "degree"],
+        "certifications_section": ["name"],
+    }
+
+    for answer in agent_evidence.get("answers", []) or []:
+        if not isinstance(answer, dict) or answer.get("status") != "answered":
+            continue
+
+        text = str(answer.get("answer") or "").strip()
+        if not text or _agent_answer_is_negative(text):
+            continue
+
+        section_key = answer.get("target_section")
+        target_key = answer.get("target_item_key")
+        target_field = answer.get("target_field")
+        if section_key not in key_fields_by_section:
+            continue
+
+        for item in updated.get(section_key, []) or []:
+            if not isinstance(item, dict):
+                continue
+            if _agent_item_key(item, key_fields_by_section[section_key]) != target_key:
+                continue
+
+            if target_field == "degree" and section_key == "education_section" and _is_missing_value(str(item.get("degree") or "")):
+                item["degree"] = text
+            elif target_field == "link" and _is_missing_value(str(item.get("link") or "")):
+                item["link"] = text
+            elif target_field == "from_date/to_date":
+                dates = _split_agent_date_answer(text)
+                if dates:
+                    if _is_missing_value(str(item.get("from_date") or "")):
+                        item["from_date"] = dates[0]
+                    if _is_missing_value(str(item.get("to_date") or "")):
+                        item["to_date"] = dates[1]
+
+    return updated
 
 
 def _flat_resume_skills(resume_data: Dict[str, Any]) -> List[str]:
@@ -1195,6 +1359,7 @@ def _rewrite_descriptions(
     job_details: Dict[str, Any],
     plan: Dict[str, Any],
     section_key: str,
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> List[str]:
     descriptions = _meaningful_strings(item.get("description") or [])
     if not descriptions:
@@ -1205,7 +1370,11 @@ def _rewrite_descriptions(
     if not rewrite_candidates:
         return descriptions
 
-    item_context = "\n".join(_text_parts({key: value for key, value in item.items() if key != "description"}))
+    agent_lines = _agent_answer_lines_for_item(agent_evidence, section_key, item)
+    item_context = "\n".join(
+        _text_parts({key: value for key, value in item.items() if key != "description"})
+        + (["User-provided agent evidence:"] + agent_lines if agent_lines else [])
+    )
     evidence = f"{item_context}\n" + "\n".join(descriptions)
     relevant = _relevant_enough_for_strong_rewrite(evidence, plan)
     max_bullets = 2 if section_key == "work_experience_section" and relevant else len(rewrite_candidates)
@@ -1292,9 +1461,10 @@ def _tailor_bullets(
     job_details: Dict[str, Any],
     plan: Dict[str, Any],
     section_key: str,
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     tailored = dict(item)
-    tailored["description"] = _rewrite_descriptions(item, job_details, plan, section_key)
+    tailored["description"] = _rewrite_descriptions(item, job_details, plan, section_key, agent_evidence)
     return tailored
 
 
@@ -1330,13 +1500,14 @@ def _tailor_work_experience(
     resume_data: Dict[str, Any],
     job_details: Dict[str, Any],
     plan: Dict[str, Any],
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     items = []
     for original in resume_data.get("work_experience_section", []) or []:
         if not isinstance(original, dict):
             continue
         item = _copy_original_fields("work_experience_section", original, original)
-        item = _tailor_bullets(item, job_details, plan, "work_experience_section")
+        item = _tailor_bullets(item, job_details, plan, "work_experience_section", agent_evidence)
         items.append(item)
     items = _sorted_by_relevance(items, plan, "work_experience_section")
     return _limit_bullets_for_one_page(items, plan, "work_experience_section")
@@ -1346,13 +1517,14 @@ def _tailor_projects(
     resume_data: Dict[str, Any],
     job_details: Dict[str, Any],
     plan: Dict[str, Any],
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     items = []
     for original in resume_data.get("projects_section", []) or []:
         if not isinstance(original, dict):
             continue
         item = _copy_original_fields("projects_section", original, original)
-        item = _tailor_bullets(item, job_details, plan, "projects_section")
+        item = _tailor_bullets(item, job_details, plan, "projects_section", agent_evidence)
         items.append(item)
     items = _sorted_by_relevance(items, plan, "projects_section")
     items = items[:MAX_PROJECTS_ONE_PAGE]
@@ -1496,7 +1668,9 @@ def build_resume(
     output_dir: str,
     rag_context: Dict[str, Any] | None = None,
     knowledge_graph: Dict[str, Any] | None = None,
+    agent_evidence: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    resume_data = _apply_agent_evidence_to_resume(resume_data, agent_evidence)
     plan = _build_tailoring_plan(job_details, resume_data)
 
     # append static fields from input resume
@@ -1523,11 +1697,13 @@ def build_resume(
         resume_data,
         job_details,
         plan,
+        agent_evidence,
     )
     tailored_resume["projects_section"] = _tailor_projects(
         resume_data,
         job_details,
         plan,
+        agent_evidence,
     )
     tailored_resume["skills_section"] = _tailor_skills(resume_data, plan)
     tailored_resume["education_section"] = _sanitize_education_section(resume_data, plan)
